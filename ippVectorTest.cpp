@@ -37,6 +37,12 @@ namespace ippe
 				numel = 0;
 			}
 			
+			bool empty()
+			{
+				if (numel == 0){return true;}
+				else{ return false;}
+			}
+			
 			virtual void resize(size_t count)
 			{
 				std::cout << "Parent class resize." << std::endl;
@@ -75,16 +81,28 @@ namespace ippe
 			~vector_64fc()
 			{
 				std::cout<<"Destructing 64fc ipp vector."<<std::endl;
-				ippsFree(data);
+				ippsFree(m_data);
+			}
+			
+			Ipp64fc* data(){
+				return m_data;
+			}
+			
+			Ipp64fc& back(){
+				return m_data[numel];
+			}
+			
+			Ipp64fc& front(){
+				return m_data[0];
 			}
 			
 			Ipp64fc& at(size_t pos)
 			{
 				if (pos < numel){
-					return data[pos];
+					return m_data[pos];
 				}
 				else{
-					throw std::out_of_range(std::string("Size is ") + std::to_string(numel));
+					throw std::out_of_range(std::string("ippe::vector::range_check: Size is ") + std::to_string(numel));
 				}
 			}
 			
@@ -95,7 +113,7 @@ namespace ippe
 					resize(cap * 2);
 				}
 				
-				data[numel] = value;
+				m_data[numel] = value;
 				numel++;
 			}
 			
@@ -104,17 +122,17 @@ namespace ippe
 				vector::resize(count);
 				std::cout << "Child class resize" << std::endl;
 				if (reMalloc){
-					Ipp64fc *newdata = ippsMalloc_64fc_L(cap);
-					ippsCopy_64fc(data, newdata, copylen);
-					ippsFree(data);
-					data = newdata;
+					Ipp64fc *newm_data = ippsMalloc_64fc_L(cap);
+					ippsCopy_64fc(m_data, newm_data, copylen);
+					ippsFree(m_data);
+					m_data = newm_data;
 					
 					reMalloc = false;
 				}
 				
 			}
 		private:
-			Ipp64fc *data;
+			Ipp64fc *m_data;
 	};
 	
 }
@@ -152,11 +170,26 @@ int main()
 	// try a resize
 	data.resize(256);
 	data.resize(128);
+	data.resize(8);
 	std::cout<<"ipp vector capacity = " << data.capacity() << " and size = " << data.size() << std::endl;
 	
 	// pushback some data
 	Ipp64fc val = {1.0, 2.0};
 	std::cout << "pushed back value is " << val.re << ", " << val.im << std::endl;
+	
+	// assign to last value
+	data.at(data.size()-1) = {10.0, 20.0};
+	// print allocate
+	for (int i = 0; i < data.size(); i++){
+		std::cout << "ipp vector val at " << i << " = " << data.at(i).re << ", " << data.at(i).im << std::endl;
+	}
+	// test exceptions
+	try{
+		data.at(data.size()) = {100.0, 200.0};
+	}
+	catch(std::out_of_range &exc){
+		std::cout<<exc.what()<<std::endl;
+	}
 
 	return 0;
 }
