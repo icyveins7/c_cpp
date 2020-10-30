@@ -75,7 +75,7 @@ namespace ippe
 			vector_64fc()
 			{
 				std::cout<<"Constructing 64fc ipp vector."<<std::endl;
-				data = ippsMalloc_64fc_L(cap);
+				m_data = ippsMalloc_64fc_L(cap);
 			}
 			
 			~vector_64fc()
