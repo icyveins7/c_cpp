@@ -13,7 +13,7 @@ int main()
 	
 	// attempt to initialize read-only non-existent
 	try{
-		sq3db mydb("notinit.db", SQLITE_OPEN_READONLY);
+		sq3db myotherdb("notinit.db", SQLITE_OPEN_READONLY);
 	}
 	catch(int err){
 		std::cout<<"Error code : "<< err << std::endl;
