@@ -2,6 +2,8 @@
 
 sq3db::sq3db(const char *in_filename, int in_flags, const char *zVfs){
 	
+	std::cout << "Base sq3db ctor." << std::endl;
+	
 	db = nullptr;
 	snprintf(filename, 256, "%s", in_filename);
 	flags = in_flags;

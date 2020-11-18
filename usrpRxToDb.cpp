@@ -1,5 +1,7 @@
 #include <iostream>
-#include "sql3ext.h"
+// #include "sql3ext.h"
+#include "usrpRXdb.h"
+
 
 // #include <uhd/types/tune_request.hpp>
 // #include <uhd/usrp/multi_usrp.hpp>
@@ -18,6 +20,9 @@ int main()
 	catch(int err){
 		std::cout<<"Error code : "<< err << std::endl;
 	}
+	
+	// attempt to initialize inherited db
+	usrpRXdb usrpdb("usrpdb.db");
 	
 	
 
