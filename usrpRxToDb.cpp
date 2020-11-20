@@ -57,9 +57,18 @@ int main()
 	// get the column names
 	std::vector<std::string> allcols = usrpdb.getColumnNames(std::string("t"));
 	for (int i = 0; i < allcols.size(); i++){
-		printf("Column name %d : %s\n", i, allcols.at(i).c_str());
+		printf("Column name %d : '%s'\n", i, allcols.at(i).c_str());
 	}
 	
+	// count rows
+	std::cout << "Row count = " << usrpdb.getRowCount(std::string("t")) << std::endl;
+	
+	// add some rows
+	usrpdb.exec(std::string("insert into t values(1, 1.0)"));
+	usrpdb.exec(std::string("insert into t values(2, 2.0)"));
+	
+	// count again
+	std::cout << "Row count after adding 2 rows = " << usrpdb.getRowCount(std::string("t")) << std::endl;
 
 	return 0;
 }

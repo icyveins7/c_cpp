@@ -13,6 +13,13 @@ public:
 	void createTable(std::string &tablename, std::vector<std::string> &columnnames, std::vector<std::string> &columntypes, bool ifNotExists=true);
 	std::vector<std::string> getTableNames(std::string pattern="");
 	std::vector<std::string> getColumnNames(std::string &tablename);
+	int getRowCount(std::string &tablename);
+	
+	// for simple statements
+	void exec(std::string &stmtstr);
+	
+	// as a reminder, any database which inherits from this should implement a virtual select function..
+	void selectColumns() {std::cout << "Unimplemented generic select function." << std::endl;}
 	
 	void prepStatement(sqlite3_stmt **stmt, std::string &stmtstr);
 	void beginTransaction();
