@@ -48,9 +48,21 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
                                      ? uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS
                                      : uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
     stream_cmd.num_samps  = size_t(num_requested_samples);
-    stream_cmd.stream_now = true;
-    stream_cmd.time_spec  = uhd::time_spec_t();
+    // stream_cmd.stream_now = true;
+	// stream_cmd.time_spec  = uhd::time_spec_t();
+	stream_cmd.stream_now = false;
+	// uhd::time_spec_t time2send(usrp->get_time_last_pps().get_full_secs() + 2, 0.0);
+	uhd::time_spec_t time2send(usrp->get_time_now().get_full_secs() + 2, 0.0); // use time_now instead of pps?
+    stream_cmd.time_spec = time2send;
     rx_stream->issue_stream_cmd(stream_cmd);
+	
+	/*
+	NOTE: time that is issued is the time the receiver is turned on. But the metadata returns the time after the DSP chain
+	Depending on the sample rate (and possibly some other factors that affect decimation), there will be a constant delay in the metadata as compared to the issued stream time!
+	*/
+	
+	// debug after stream cmd
+	printf("Time issued = %.6f\n", time2send.get_real_secs());
 
     typedef std::map<size_t, size_t> SizeMap;
     SizeMap mapSizes;
@@ -167,6 +179,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     }
 }
 
+// only use this for non-gpsdo
 void setUSRP_RXsettings(uhd::usrp::multi_usrp::sptr usrp, double rate=1e6, double freq=1.5e9, double gain=0, double lo_offset=0, size_t channel=0,
 						int64_t full_secs=0, double frac_secs=0, bool specifyTime=false)
 {
@@ -199,7 +212,13 @@ void setUSRP_RXsettings(uhd::usrp::multi_usrp::sptr usrp, double rate=1e6, doubl
 		t = uhd::time_spec_t(nowsecs);
 	}
 	usrp->set_time_now(t);
-	std::cout << "Time set now to " << usrp->get_time_now().get_real_secs() << std::endl;
+	usrp->set_time_unknown_pps(usrp->get_time_now() + uhd::time_spec_t(1.0));
+	
+	// wait a bit?
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	
+	printf("Time set now to %.6f\n", usrp->get_time_now().get_real_secs());
+	printf("Time last pps set to %.6f\n", usrp->get_time_last_pps().get_real_secs());
 	
 }
 
@@ -219,6 +238,11 @@ int main()
 	size_t samps_per_buff = 100000;
 	unsigned long long num_requested_samples = 3000000;
 
+	// check time via pps? is it different? yes it is
+	uhd::time_spec_t ppstime = usrp->get_time_last_pps();
+	std::cout<<"Time last pps = " << ppstime.get_real_secs() << std::endl;
+	std::cout<<"Time now = " << usrp->get_time_now().get_real_secs() << std::endl;
+	
 	recv_to_file<std::complex<short>>(
 			usrp,
 			cpu_format,
