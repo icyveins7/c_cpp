@@ -14,6 +14,40 @@ void sig_int_handler(int)
 }
 
 template <typename samp_type>
+void send_from_file(
+    uhd::tx_streamer::sptr tx_stream, const std::string& file, size_t samps_per_buff)
+{
+    uhd::tx_metadata_t md;
+    md.start_of_burst = false;
+    md.end_of_burst   = false;
+    std::vector<samp_type> buff(samps_per_buff);
+    std::ifstream infile(file.c_str(), std::ifstream::binary);
+
+    // loop until the entire file has been read
+
+    while (not md.end_of_burst and not stop_signal_called) {
+        infile.read((char*)&buff.front(), buff.size() * sizeof(samp_type));
+        size_t num_tx_samps = size_t(infile.gcount() / sizeof(samp_type));
+
+        md.end_of_burst = infile.eof();
+
+		// what if i delay each time?
+		std::this_thread::sleep_for(std::chrono::milliseconds(100)); // so this causes the U ie underflow
+		
+		auto t1 = std::chrono::high_resolution_clock::now();
+        tx_stream->send(&buff.front(), num_tx_samps, md, 0.5);
+		// remember that this doesnt block unless there is no more space on the usrp buffer 
+		// (so it's likely to take slightly less time, unless the number of samples sent is extremely small, in which case it'll return almost immediately because it doesn't need to wait to flush/transmit the buffer)
+		// if you want to do bursty signals, then probably better off setting the tx_metadata_t to specific times, otherwise the U will show up
+		auto t2 = std::chrono::high_resolution_clock::now();
+		auto time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+		std::cout << "Time for 'send' to return = " << time_span.count() << "s" << std::endl;
+    }
+
+    infile.close();
+}
+
+template <typename samp_type>
 void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     const std::string& cpu_format,
     const std::string& wire_format,
@@ -132,10 +166,10 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 
         num_total_samps += num_rx_samps;
 
-		// // ignore the writes for now..
-        // if (outfile.is_open()) {
-            // outfile.write((const char*)&buff.front(), num_rx_samps * sizeof(samp_type));
-        // }
+		// ignore the writes for now..
+        if (outfile.is_open()) {
+            outfile.write((const char*)&buff.front(), num_rx_samps * sizeof(samp_type));
+        }
 
         if (bw_summary) {
             last_update_samps += num_rx_samps;
@@ -149,6 +183,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
                 last_update       = now;
             }
         }
+		
     }
     const auto actual_stop_time = std::chrono::steady_clock::now();
 
@@ -235,8 +270,8 @@ int main()
 	std::string wire_format("sc16");
 	size_t channel = 0;
 	std::string file("usrpSamples.dat");
-	size_t samps_per_buff = 100000;
-	unsigned long long num_requested_samples = 3000000;
+	size_t samps_per_buff = 1000000;
+	unsigned long long num_requested_samples = 4000000;
 
 	// check time via pps? is it different? yes it is
 	uhd::time_spec_t ppstime = usrp->get_time_last_pps();
@@ -251,6 +286,16 @@ int main()
 			file,
 			samps_per_buff,
 			num_requested_samples);
+	
+
+	// create a transmit streamer
+    std::vector<size_t> channel_nums;
+    uhd::stream_args_t stream_args(cpu_format, wire_format);
+    channel_nums.push_back(0);
+    stream_args.channels             = channel_nums;
+    uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
+			
+	send_from_file<std::complex<short>>(tx_stream, file, samps_per_buff/2);
 
 	return 0;
 }
