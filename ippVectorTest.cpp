@@ -19,7 +19,7 @@ namespace ippe
 			bool reMalloc;
 			T *m_data;
 		
-			void vector_base(size_t count = 0)
+			void vector_base(size_t count)
 			{
 				std::cout << "Base ctor for all specialized types." << std::endl;
 				numel = count;
@@ -39,7 +39,7 @@ namespace ippe
 			}
 			
 			T& back(){
-				return m_data[numel];
+				return m_data[numel-1];
 			}
 			
 			T& front(){
@@ -102,8 +102,8 @@ namespace ippe
 					numel = count;
 				}
 			}
-			
-			void resize();
+	
+			void resize(size_t count);
 			
 			~vector()
 			{
@@ -132,7 +132,7 @@ namespace ippe
 		std::cout<<"Constructing Ipp64fc vector."<<std::endl;
 		
 		m_data = ippsMalloc_64fc_L(cap);
-	};
+	}
 	
 	// ========== specialized resize
 	
@@ -187,38 +187,45 @@ int main()
 	oldvector.resize(2);
 	std::cout << "std vector capacity = " << oldvector.capacity() << " and size = " << oldvector.size() << std::endl;
 	
+	// test wrong template?
+	try{
+		ippe::vector<int> wrongdata;
+	}
+	catch(int err)
+	{
+		std::cout<<"Caught error " << err << std::endl;
+	}
+	
 	// create ipp template vectors
-	ippe:vector<Ipp64fc> data;
+	ippe::vector<Ipp64fc> data;
+	std::cout<<"ipp vector capacity = " << data.capacity() << " and size = " << data.size() << std::endl;
+
+	// try a resize
+	data.resize(256);
+	data.resize(128);
+	data.resize(8);
 	std::cout<<"ipp vector capacity = " << data.capacity() << " and size = " << data.size() << std::endl;
 	
+	// pushback some data
+	Ipp64fc val = {1.0, 2.0};
+	data.push_back(val);
+	std::cout<<"ipp vector size after push back is " << data.size() << std::endl;
+	std::cout << "pushed back value is " << data.back().re << ", " << data.back().im << std::endl;
+	std::cout << "or directly, = " << data.at(8).re << ", " << data.at(8).im << std::endl;
 	
-	// // create some ipp vectors?
-	// ippe::vector_64fc data;
-	// std::cout<<"ipp vector capacity = " << data.capacity() << " and size = " << data.size() << std::endl;
-	
-	// // try a resize
-	// data.resize(256);
-	// data.resize(128);
-	// data.resize(8);
-	// std::cout<<"ipp vector capacity = " << data.capacity() << " and size = " << data.size() << std::endl;
-	
-	// // pushback some data
-	// Ipp64fc val = {1.0, 2.0};
-	// std::cout << "pushed back value is " << val.re << ", " << val.im << std::endl;
-	
-	// // assign to last value
-	// data.at(data.size()-1) = {10.0, 20.0};
-	// // print allocate
-	// for (int i = 0; i < data.size(); i++){
-		// std::cout << "ipp vector val at " << i << " = " << data.at(i).re << ", " << data.at(i).im << std::endl;
-	// }
-	// // test exceptions
-	// try{
-		// data.at(data.size()) = {100.0, 200.0};
-	// }
-	// catch(std::out_of_range &exc){
-		// std::cout<<exc.what()<<std::endl;
-	// }
+	// assign to last value
+	data.at(data.size()-1) = {10.0, 20.0};
+	// print allocate
+	for (int i = 0; i < data.size(); i++){
+		std::cout << "ipp vector val at " << i << " = " << data.at(i).re << ", " << data.at(i).im << std::endl;
+	}
+	// test exceptions
+	try{
+		data.at(data.size()) = {100.0, 200.0};
+	}
+	catch(std::out_of_range &exc){
+		std::cout<<exc.what()<<std::endl;
+	}
 
 	return 0;
 }
