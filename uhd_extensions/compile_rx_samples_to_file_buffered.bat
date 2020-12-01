@@ -1,0 +1,1 @@
+cl rx_samples_to_file_buffered.cpp F:\uhd-3.15.0.0-install\lib\uhd.lib /I"F:\uhd-3.15.0.0-install\include" /EHsc /O2 /I"F:\boost_1_72_0" /link "/LIBPATH:F:\boost_1_72_0\lib64-msvc-14.0"

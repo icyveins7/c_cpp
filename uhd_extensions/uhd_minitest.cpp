@@ -72,9 +72,14 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 
     uhd::rx_metadata_t md;
     std::vector<samp_type> buff(samps_per_buff);
-    std::ofstream outfile;
-    if (not null)
-        outfile.open(file.c_str(), std::ofstream::binary);
+    // std::ofstream outfile;
+    // if (not null)
+        // outfile.open(file.c_str(), std::ofstream::binary);
+	// // C style files for performance, here as reference, we use second by second below
+	FILE *fp;
+	// fp = fopen(file.c_str(), "wb");
+	char filename[512];
+	
     bool overflow_message = true;
 
     // setup streaming
@@ -167,8 +172,11 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
         num_total_samps += num_rx_samps;
 
 		// ignore the writes for now..
-        if (outfile.is_open()) {
-            outfile.write((const char*)&buff.front(), num_rx_samps * sizeof(samp_type));
+		snprintf(filename, 512, "%lld.bin", rxtime.get_full_secs());
+        if ((fp = fopen(filename,"wb")) != NULL) {
+            // outfile.write((const char*)&buff.front(), num_rx_samps * sizeof(samp_type));
+			fwrite((const char*)&buff.front(), sizeof(samp_type), num_rx_samps, fp);
+			fclose(fp);
         }
 
         if (bw_summary) {
@@ -190,9 +198,12 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
     rx_stream->issue_stream_cmd(stream_cmd);
 
-    if (outfile.is_open()) {
-        outfile.close();
-    }
+    // if (outfile.is_open()) {
+        // outfile.close();
+    // }
+	// if (fp != NULL){ // refer to in-loop fcloses
+		// fclose(fp);
+	// }
 
     if (stats) {
         std::cout << std::endl;
@@ -270,7 +281,7 @@ int main()
 	std::string wire_format("sc16");
 	size_t channel = 0;
 	std::string file("usrpSamples.dat");
-	size_t samps_per_buff = 1000000;
+	size_t samps_per_buff = 1000000; // for now we fix it to the sample rate
 	unsigned long long num_requested_samples = 4000000;
 
 	// check time via pps? is it different? yes it is

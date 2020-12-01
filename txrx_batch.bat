@@ -1,1 +1,0 @@
-txrx_loopback_to_file.exe --tx-rate 500000 --rx-rate 500000 --tx-freq 1500000000 --rx-freq 1500000000 --tx-gain 60 --rx-gain 60 --wave-type SINE --wave-freq 100000
