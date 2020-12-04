@@ -13,6 +13,7 @@
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
+#include <boost/filesystem.hpp>
 #include <chrono>
 #include <complex>
 #include <csignal>
@@ -274,7 +275,7 @@ bool check_locked_sensor(std::vector<std::string> sensor_names,
 int UHD_SAFE_MAIN(int argc, char* argv[])
 {
     // variables to be set by po
-    std::string args, file, type, ant, subdev, ref, wirefmt;
+    std::string args, file, type, ant, subdev, ref, wirefmt, folder;
     size_t channel, total_num_samps, spb;
     double rate, freq, gain, bw, total_time, setup_time, lo_offset;
 
@@ -309,7 +310,21 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("continue", "don't abort on a bad packet")
         ("skip-lo", "skip checking LO lock status")
         ("int-n", "tune USRP with integer-N tuning")
+		("folder", po::value<std::string>(&folder)->default_value(""), "path to write files to (will be created if it doesn't exist)")
     ;
+	
+	// create directory if needed
+	boost::filesystem::create_directories(folder.c_str());
+	// check if it exists
+	if(boost::filesystem::is_directory(folder.c_str())){
+		std::cout << "Data folder at " << folder << " has been created/exists. Proceeding..." << std::endl;
+	}
+	else{
+		std::cout << "Failed to create folder at " << folder << ", exiting!" << std::endl;
+		return 1;
+	}
+	
+	
     // clang-format on
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -320,7 +335,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         std::cout << boost::format("UHD RX samples to file %s") % desc << std::endl;
         std::cout << std::endl
                   << "This application streams data from a single channel of a USRP "
-                     "device to a file.\n"
+                     "device to multiple 1 second files.\n"
                   << std::endl;
         return ~0;
     }
