@@ -10,6 +10,7 @@ int main(){
 	Ipp32f *data2 = ippsMalloc_32f_L(len);
 	Ipp32f *data3 = ippsMalloc_32f_L(len);
 	std::cout<<"Allocated for length " << len << std::endl;
+	std::cout<<"All tests done in 32f (NOT 32fc), just as a gauge." << std::endl;
 	
 	// test add (we just run this to make sure the ipp library is warmed up / loaded / whatever
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -60,6 +61,35 @@ int main(){
 	auto tmodf2 = std::chrono::high_resolution_clock::now();
 	auto tmodf = std::chrono::duration_cast<std::chrono::duration<double>>(tmodf2 - tmodf1);
 	std::cout << "Took  " << tmodf.count() << " seconds to complete modfs" << std::endl;
+	
+	// test sin
+	auto tsin1 = std::chrono::high_resolution_clock::now();
+	ippsSin_32f_A24 (data1, data2, len);
+	auto tsin2 = std::chrono::high_resolution_clock::now();
+	auto tsin = std::chrono::duration_cast<std::chrono::duration<double>>(tsin2 - tsin1);
+	std::cout << "Took  " << tsin.count() << " seconds to complete sins, A24 (max for 32f)" << std::endl;
+	
+	// test cos
+	auto tcos1 = std::chrono::high_resolution_clock::now();
+	ippsCos_32f_A24 (data1, data2, len);
+	auto tcos2 = std::chrono::high_resolution_clock::now();
+	auto tcos = std::chrono::duration_cast<std::chrono::duration<double>>(tcos2 - tcos1);
+	std::cout << "Took  " << tcos.count() << " seconds to complete cos, A24 (max for 32f)" << std::endl;
+	
+	// test sincos
+	auto tsincos1 = std::chrono::high_resolution_clock::now();
+	ippsSinCos_32f_A24 (data1, data2, data3, len);
+	auto tsincos2 = std::chrono::high_resolution_clock::now();
+	auto tsincos = std::chrono::duration_cast<std::chrono::duration<double>>(tsincos2 - tsincos1);
+	std::cout << "Took  " << tsincos.count() << " seconds to complete sincos, A24 (max for 32f)" << std::endl;
+	
+	// test tone
+	Ipp32f phase = 0;
+	auto ttone1 = std::chrono::high_resolution_clock::now();
+	ippsTone_32f(data1, len, 1.0f, 0.2f, &phase, ippAlgHintAccurate);
+	auto ttone2 = std::chrono::high_resolution_clock::now();
+	auto ttone = std::chrono::duration_cast<std::chrono::duration<double>>(ttone2 - ttone1);
+	std::cout << "Took  " << ttone.count() << " seconds to complete tone" << std::endl;
 	
 	
 	// cleanup
