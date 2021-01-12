@@ -30,10 +30,11 @@ void sig_int_handler(int)
 }
 
 template <typename samp_type>
-void save_to_file(long long int second, std::vector<samp_type> &recdata)
+void save_to_file(const std::string& folder, long long int second, std::vector<samp_type> &recdata)
 {
 	char filename[512];
-	snprintf(filename, 512, "%lld.bin", second);
+	snprintf(filename, 512, "%s\\%lld.bin", folder.c_str(), second);
+    printf("Writing to %s\n", filename);
 	
 	FILE *fp = fopen(filename, "wb");
 	if (fp != NULL)
@@ -54,6 +55,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     const std::string& file,
     size_t samps_per_buff,
     unsigned long long num_requested_samples,
+    const std::string& folder,
     double time_requested       = 0.0,
     bool bw_summary             = false,
     bool stats                  = false,
@@ -175,7 +177,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 		if (bufIdx == rx_rate) // then move to next buffer
 		{
 			// start thread to write current buffer
-			std::thread t(save_to_file<samp_type>, rxtime.get_full_secs(), buff[tIdx]);
+			std::thread t(save_to_file<samp_type>, folder, rxtime.get_full_secs(), buff[tIdx]);
 			t.detach();
 			
 			// update indices
@@ -313,16 +315,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 		("folder", po::value<std::string>(&folder)->default_value(""), "path to write files to (will be created if it doesn't exist)")
     ;
 	
-	// create directory if needed
-	boost::filesystem::create_directories(folder.c_str());
-	// check if it exists
-	if(boost::filesystem::is_directory(folder.c_str())){
-		std::cout << "Data folder at " << folder << " has been created/exists. Proceeding..." << std::endl;
-	}
-	else{
-		std::cout << "Failed to create folder at " << folder << ", exiting!" << std::endl;
-		return 1;
-	}
+	
 	
 	
     // clang-format on
@@ -338,6 +331,17 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
                      "device to multiple 1 second files.\n"
                   << std::endl;
         return ~0;
+    }
+
+    // create directory if needed
+    boost::filesystem::create_directories(folder.c_str());
+    // check if it exists
+    if (boost::filesystem::is_directory(folder.c_str())) {
+        std::cout << "Data folder at " << folder << " has been created/exists. Proceeding..." << std::endl;
+    }
+    else {
+        std::cout << "Failed to create folder at " << folder << ", exiting!" << std::endl;
+        return 1;
     }
 
     bool bw_summary             = vm.count("progress") > 0;
@@ -359,6 +363,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     // Lock mboard clocks
     if (vm.count("ref")) {
         usrp->set_clock_source(ref);
+        usrp->set_time_source(ref);
     }
 
     // always select the subdevice first, the channel mapping affects the other settings
@@ -460,6 +465,48 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 		usrp->set_time_now(t);
 		printf("========= Time set now to %.6f\n", usrp->get_time_now().get_real_secs());
 	}
+
+    else if (usrp->get_time_source(0) == "gpsdo"){
+        std::cout << "Using time source " << usrp->get_time_source(0) << std::endl;
+        std::cout << "Using clock source " << usrp->get_clock_source(0) << std::endl;
+
+
+        // Set to GPS time
+        uhd::time_spec_t gps_time = uhd::time_spec_t(
+            int64_t(usrp->get_mboard_sensor("gps_time", 0).to_int()));
+        usrp->set_time_next_pps(gps_time + 1.0, 0);
+
+        // Wait for it to apply
+        // The wait is 2 seconds because N-Series has a known issue where
+        // the time at the last PPS does not properly update at the PPS edge
+        // when the time is actually set.
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        // Check times
+        gps_time = uhd::time_spec_t(
+            int64_t(usrp->get_mboard_sensor("gps_time", 0).to_int()));
+        uhd::time_spec_t time_last_pps = usrp->get_time_last_pps(0);
+        std::cout << "USRP time: "
+            << (boost::format("%0.9f") % time_last_pps.get_real_secs())
+            << std::endl;
+        std::cout << "GPSDO time: "
+            << (boost::format("%0.9f") % gps_time.get_real_secs()) << std::endl;
+        if (gps_time.get_real_secs() == time_last_pps.get_real_secs()) {
+            std::cout << std::endl
+                << "SUCCESS: USRP time synchronized to GPS time" << std::endl
+                << std::endl;
+        }
+        else {
+            std::cerr << std::endl
+                << "ERROR: Failed to synchronize USRP time to GPS time"
+                << std::endl
+                << std::endl;
+        }
+    }
+
+    else {
+        std::cout << "Not configured for non-internal/gpsdo sources yet!" << std::endl;
+    }
 	
 	// check that samples per buffer is a divisor of sample rate
 	if (static_cast<int>(rate) % spb != 0)
@@ -483,6 +530,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         file,                     \
         spb,                      \
         total_num_samps,          \
+        folder,                   \
         total_time,               \
         bw_summary,               \
         stats,                    \
