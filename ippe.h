@@ -18,7 +18,7 @@ namespace ippe
 		
 			void vector_base(size_t count)
 			{
-				std::cout << "Base ctor for all specialized types." << std::endl;
+				// std::cout << "Base ctor for all specialized types." << std::endl;
 				numel = count;
 				cap = INITIAL_CAP;
 				
@@ -87,7 +87,7 @@ namespace ippe
 			
 			void base_resize(size_t count)
 			{
-				std::cout << "Base class resize." << std::endl;
+				// std::cout << "Base class resize." << std::endl;
 				if (count > cap)
 				{
 					copylen = numel; // old, shorter length
@@ -104,7 +104,7 @@ namespace ippe
 			
 			~vector()
 			{
-				std::cout<<"Destructing base ipp vector."<<std::endl;
+				// std::cout<<"Destructing base ipp vector."<<std::endl;
 				
 				ippsFree(m_data);
 			}
@@ -116,7 +116,7 @@ namespace ippe
 	template <typename T>
 	vector<T>::vector(size_t count)
 	{
-		std::cout<<"There is no default template for IPP vectors. Please specify a valid IPP type." << std::endl;
+		// std::cout<<"There is no default template for IPP vectors. Please specify a valid IPP type." << std::endl;
 		throw NO_DEFAULT;
 	}
 	
@@ -126,7 +126,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp8u vector."<<std::endl;
+		// std::cout<<"Constructing Ipp8u vector."<<std::endl;
 		
 		m_data = ippsMalloc_8u_L(cap);
 	}
@@ -137,7 +137,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp16u vector."<<std::endl;
+		// std::cout<<"Constructing Ipp16u vector."<<std::endl;
 		
 		m_data = ippsMalloc_16u_L(cap);
 	}
@@ -148,7 +148,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp32u vector."<<std::endl;
+		// std::cout<<"Constructing Ipp32u vector."<<std::endl;
 		
 		m_data = ippsMalloc_32u_L(cap);
 	}
@@ -159,7 +159,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp8s vector."<<std::endl;
+		// std::cout<<"Constructing Ipp8s vector."<<std::endl;
 		
 		m_data = ippsMalloc_8s_L(cap);
 	}
@@ -170,7 +170,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp16s vector."<<std::endl;
+		// std::cout<<"Constructing Ipp16s vector."<<std::endl;
 		
 		m_data = ippsMalloc_16s_L(cap);
 	}
@@ -181,7 +181,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp32s vector."<<std::endl;
+		// std::cout<<"Constructing Ipp32s vector."<<std::endl;
 		
 		m_data = ippsMalloc_32s_L(cap);
 	}
@@ -192,7 +192,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp64s vector."<<std::endl;
+		// std::cout<<"Constructing Ipp64s vector."<<std::endl;
 		
 		m_data = ippsMalloc_64s_L(cap);
 	}
@@ -203,7 +203,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp32f vector."<<std::endl;
+		// std::cout<<"Constructing Ipp32f vector."<<std::endl;
 		
 		m_data = ippsMalloc_32f_L(cap);
 	}
@@ -214,7 +214,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp64f vector."<<std::endl;
+		// std::cout<<"Constructing Ipp64f vector."<<std::endl;
 		
 		m_data = ippsMalloc_64f_L(cap);
 	}
@@ -225,7 +225,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp8sc vector."<<std::endl;
+		// std::cout<<"Constructing Ipp8sc vector."<<std::endl;
 		
 		m_data = ippsMalloc_8sc_L(cap);
 	}
@@ -236,7 +236,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp16sc vector."<<std::endl;
+		// std::cout<<"Constructing Ipp16sc vector."<<std::endl;
 		
 		m_data = ippsMalloc_16sc_L(cap);
 	}
@@ -247,7 +247,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp32sc vector."<<std::endl;
+		// std::cout<<"Constructing Ipp32sc vector."<<std::endl;
 		
 		m_data = ippsMalloc_32sc_L(cap);
 	}
@@ -258,7 +258,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp64sc vector."<<std::endl;
+		// std::cout<<"Constructing Ipp64sc vector."<<std::endl;
 		
 		m_data = ippsMalloc_64sc_L(cap);
 	}
@@ -269,7 +269,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp32fc vector."<<std::endl;
+		// std::cout<<"Constructing Ipp32fc vector."<<std::endl;
 		
 		m_data = ippsMalloc_32fc_L(cap);
 	}
@@ -280,7 +280,7 @@ namespace ippe
 	{
 		vector_base(count);
 		
-		std::cout<<"Constructing Ipp64fc vector."<<std::endl;
+		// std::cout<<"Constructing Ipp64fc vector."<<std::endl;
 		
 		m_data = ippsMalloc_64fc_L(cap);
 	}
@@ -291,7 +291,7 @@ namespace ippe
 	template <typename T>
 	void vector<T>::resize(size_t count)
 	{
-		std::cout << "No default resize. This should never happen, should have been caught in ctor." << std::endl;
+		// std::cout << "No default resize. This should never happen, should have been caught in ctor." << std::endl;
 		throw NO_DEFAULT;
 	}
 	
@@ -301,7 +301,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp8u specific resize. " << std::endl;
+		// std::cout << "Ipp8u specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp8u *newm_data = ippsMalloc_8u_L(cap);
 			ippsCopy_8u(m_data, newm_data, copylen);
@@ -317,7 +317,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp16u specific resize. " << std::endl;
+		// std::cout << "Ipp16u specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp16u *newm_data = ippsMalloc_16u_L(cap);
 			ippsCopy_16s((Ipp16s*)m_data, (Ipp16s*)newm_data, copylen); // reuse 16s for non-existent 16u
@@ -333,7 +333,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp32u specific resize. " << std::endl;
+		// std::cout << "Ipp32u specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp32u *newm_data = ippsMalloc_32u_L(cap);
 			ippsCopy_32s((Ipp32s*)m_data, (Ipp32s*)newm_data, copylen); // reuse 32s
@@ -349,7 +349,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp8s specific resize. " << std::endl;
+		// std::cout << "Ipp8s specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp8s *newm_data = ippsMalloc_8s_L(cap);
 			ippsCopy_8u((Ipp8u*)m_data, (Ipp8u*)newm_data, copylen); // reuse 8u
@@ -365,7 +365,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp16s specific resize. " << std::endl;
+		// std::cout << "Ipp16s specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp16s *newm_data = ippsMalloc_16s_L(cap);
 			ippsCopy_16s(m_data, newm_data, copylen);
@@ -381,7 +381,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp32s specific resize. " << std::endl;
+		// std::cout << "Ipp32s specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp32s *newm_data = ippsMalloc_32s_L(cap);
 			ippsCopy_32s(m_data, newm_data, copylen);
@@ -397,7 +397,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp64s specific resize. " << std::endl;
+		// std::cout << "Ipp64s specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp64s *newm_data = ippsMalloc_64s_L(cap);
 			ippsCopy_64s(m_data, newm_data, copylen);
@@ -413,7 +413,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp32f specific resize. " << std::endl;
+		// std::cout << "Ipp32f specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp32f *newm_data = ippsMalloc_32f_L(cap);
 			ippsCopy_32f(m_data, newm_data, copylen);
@@ -429,7 +429,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp64f specific resize. " << std::endl;
+		// std::cout << "Ipp64f specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp64f *newm_data = ippsMalloc_64f_L(cap);
 			ippsCopy_64f(m_data, newm_data, copylen);
@@ -445,7 +445,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp8sc specific resize. " << std::endl;
+		// std::cout << "Ipp8sc specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp8sc *newm_data = ippsMalloc_8sc_L(cap);
 			ippsCopy_16s((Ipp16s*)m_data, (Ipp16s*)newm_data, copylen); // reuse 16s
@@ -461,7 +461,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp16sc specific resize. " << std::endl;
+		// std::cout << "Ipp16sc specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp16sc *newm_data = ippsMalloc_16sc_L(cap);
 			ippsCopy_16sc(m_data, newm_data, copylen);
@@ -477,7 +477,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp32sc specific resize. " << std::endl;
+		// std::cout << "Ipp32sc specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp32sc *newm_data = ippsMalloc_32sc_L(cap);
 			ippsCopy_32sc(m_data, newm_data, copylen);
@@ -493,7 +493,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp64sc specific resize. " << std::endl;
+		// std::cout << "Ipp64sc specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp64sc *newm_data = ippsMalloc_64sc_L(cap);
 			ippsCopy_64sc(m_data, newm_data, copylen);
@@ -509,7 +509,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp32fc specific resize. " << std::endl;
+		// std::cout << "Ipp32fc specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp32fc *newm_data = ippsMalloc_32fc_L(cap);
 			ippsCopy_32fc(m_data, newm_data, copylen);
@@ -525,7 +525,7 @@ namespace ippe
 	{
 		base_resize(count);
 				
-		std::cout << "Ipp64fc specific resize. " << std::endl;
+		// std::cout << "Ipp64fc specific resize. " << std::endl;
 		if (reMalloc){
 			Ipp64fc *newm_data = ippsMalloc_64fc_L(cap);
 			ippsCopy_64fc(m_data, newm_data, copylen);
