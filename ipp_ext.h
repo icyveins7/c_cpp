@@ -1,4 +1,5 @@
 #include "ipp.h"
+#include <string>
 
 #define NO_DEFAULT -1
 
