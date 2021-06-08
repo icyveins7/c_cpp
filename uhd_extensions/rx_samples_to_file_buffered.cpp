@@ -72,7 +72,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
     uhd::rx_metadata_t md;
-	int rx_rate = static_cast<int>(usrp->get_rx_rate());
+	int rx_rate = static_cast<int>(round(usrp->get_rx_rate()));
 	std::cout << "======= Using 1 second buffers (x2) of " << rx_rate << " length." << std::endl;
     std::vector<samp_type> buff[2]; // this is the temporary buffer, but now we have to make it 1 second since thats the file length
 	for (int i = 0; i < 2; i++){
