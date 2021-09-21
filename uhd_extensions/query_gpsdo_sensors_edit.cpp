@@ -207,50 +207,67 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     }
     std::cout << "The GPSDO is warmed up and talking." << std::endl;
 
-    // Check for GPS lock
-    uhd::sensor_value_t gps_locked = usrp->get_mboard_sensor("gps_locked", 0);
-    ;
-    if (not gps_locked.to_bool()) {
-        std::cout << boost::format(
-            "\nGPS does not have lock. Wait a few minutes and try again.\n");
-        std::cout << boost::format("NMEA strings and device time may not be accurate "
-                                   "until lock is achieved.\n\n");
-    } else {
-        std::cout << boost::format("GPS Locked");
+    // Loop til aligned and locked
+    bool aligned = false;
+    bool locked = false;
+    while (!aligned || !locked) {
+
+        // Check for GPS lock
+        uhd::sensor_value_t gps_locked = usrp->get_mboard_sensor("gps_locked", 0);
+
+        locked = gps_locked.to_bool();
+
+        if (not gps_locked.to_bool()) {
+            std::cout << boost::format(
+                "\nGPS does not have lock. Wait a few minutes and try again.\n");
+            std::cout << boost::format("NMEA strings and device time may not be accurate "
+                "until lock is achieved.\n\n");
+        }
+        else {
+            std::cout << boost::format("GPS Locked");
+
+        }
+
+        // Check PPS and compare UHD device time to GPS time
+        uhd::sensor_value_t gps_time = usrp->get_mboard_sensor("gps_time");
+        uhd::time_spec_t last_pps_time = usrp->get_time_last_pps();
+
+        // we only care about the full seconds
+        signed gps_seconds = gps_time.to_int();
+        long long pps_seconds = last_pps_time.to_ticks(1.0);
+
+        if (pps_seconds != gps_seconds) {
+            std::cout << "\nTrying to align the device time to GPS time..." << std::endl;
+
+            gps_time = usrp->get_mboard_sensor("gps_time");
+
+            // set the device time to the GPS time
+            // getting the GPS time returns just after the PPS edge, so just add a
+            // second and set the device time at the next PPS edge
+            usrp->set_time_next_pps(uhd::time_spec_t(gps_time.to_int() + 1.0));
+            // allow some time to make sure the PPS has come…
+            std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+            //…then ask
+            gps_seconds = usrp->get_mboard_sensor("gps_time").to_int();
+            pps_seconds = usrp->get_time_last_pps().to_ticks(1.0);
+        }
+
+        if (pps_seconds == gps_seconds) {
+            std::cout << boost::format("GPS and UHD Device time are aligned.\n");
+            aligned = true;
+        }
+        else {
+            std::cout << boost::format(
+                "Could not align UHD Device time to GPS time. Giving up.\n");
+            aligned = false;
+        }
+        std::cout << boost::format("last_pps: %ld vs gps: %ld.") % pps_seconds % gps_seconds
+            << std::endl;
+
+
+        // Sleep
+        std::this_thread::sleep_for(std::chrono::seconds(2));
     }
-
-    // Check PPS and compare UHD device time to GPS time
-    uhd::sensor_value_t gps_time   = usrp->get_mboard_sensor("gps_time");
-    uhd::time_spec_t last_pps_time = usrp->get_time_last_pps();
-
-    // we only care about the full seconds
-    signed gps_seconds    = gps_time.to_int();
-    long long pps_seconds = last_pps_time.to_ticks(1.0);
-
-    if (pps_seconds != gps_seconds) {
-        std::cout << "\nTrying to align the device time to GPS time..." << std::endl;
-
-        gps_time = usrp->get_mboard_sensor("gps_time");
-
-        // set the device time to the GPS time
-        // getting the GPS time returns just after the PPS edge, so just add a
-        // second and set the device time at the next PPS edge
-        usrp->set_time_next_pps(uhd::time_spec_t(gps_time.to_int() + 1.0));
-        // allow some time to make sure the PPS has come…
-        std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-        //…then ask
-        gps_seconds = usrp->get_mboard_sensor("gps_time").to_int();
-        pps_seconds = usrp->get_time_last_pps().to_ticks(1.0);
-    }
-
-    if (pps_seconds == gps_seconds) {
-        std::cout << boost::format("GPS and UHD Device time are aligned.\n");
-    } else {
-        std::cout << boost::format(
-            "Could not align UHD Device time to GPS time. Giving up.\n");
-    }
-    std::cout << boost::format("last_pps: %ld vs gps: %ld.") % pps_seconds % gps_seconds
-              << std::endl;
 
     // print NMEA strings
     try {
