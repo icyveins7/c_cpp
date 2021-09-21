@@ -14,6 +14,8 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
+
 #include <chrono>
 #include <complex>
 #include <csignal>
@@ -34,7 +36,7 @@ void save_to_file(const std::string& folder, long long int second, std::vector<s
 {
 	char filename[512];
 	snprintf(filename, 512, "%s\\%lld.bin", folder.c_str(), second);
-    printf("Writing to %s\n", filename);
+    // printf("Writing to %s\n", filename);
 	
 	FILE *fp = fopen(filename, "wb");
 	if (fp != NULL)
@@ -51,11 +53,11 @@ template <typename samp_type>
 void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     const std::string& cpu_format,
     const std::string& wire_format,
-    const size_t& channel,
-    const std::string& file,
+    std::vector<size_t> &channel_nums,
+
     size_t samps_per_buff,
     unsigned long long num_requested_samples,
-    const std::string& folder,
+    std::vector<std::string> &folders,
     double time_requested       = 0.0,
     bool bw_summary             = false,
     bool stats                  = false,
@@ -66,27 +68,91 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     unsigned long long num_total_samps = 0;
     // create a receive streamer
     uhd::stream_args_t stream_args(cpu_format, wire_format);
-    std::vector<size_t> channel_nums;
-    channel_nums.push_back(channel);
+    // std::vector<size_t> channel_nums;
+    // channel_nums.push_back(channel);
     stream_args.channels             = channel_nums;
     uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+	
+	// adjust timing if using internal reference clocks (we have moved this to after streamer creation, since streamer creation screws it up?)
+	if (usrp->get_time_source(0) == "internal"){
+		std::cout << "========= Using internal clock. Adjusting USRP time to computer time." << std::endl;
+		auto now = std::chrono::system_clock::now().time_since_epoch();
+		// auto nowsecs = std::chrono::duration_cast<std::chrono::seconds>(now).count();
+		double nowsecs = std::chrono::duration<double>(now).count();
+		printf("========= Seconds since epoch = %.6f \n", nowsecs);
+		
+		uhd::time_spec_t t(nowsecs);
+		usrp->set_time_now(t);
+		printf("========= Time set now to %.6f\n", usrp->get_time_now().get_real_secs());
+	}
+
+    else if (usrp->get_time_source(0) == "gpsdo"){
+        std::cout << "Using time source " << usrp->get_time_source(0) << std::endl;
+        std::cout << "Using clock source " << usrp->get_clock_source(0) << std::endl;
+
+
+        // Set to GPS time
+        uhd::time_spec_t gps_time = uhd::time_spec_t(
+            int64_t(usrp->get_mboard_sensor("gps_time", 0).to_int()));
+        usrp->set_time_next_pps(gps_time + 1.0, 0);
+
+        // Wait for it to apply
+        // The wait is 2 seconds because N-Series has a known issue where
+        // the time at the last PPS does not properly update at the PPS edge
+        // when the time is actually set.
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        // Check times
+        gps_time = uhd::time_spec_t(
+            int64_t(usrp->get_mboard_sensor("gps_time", 0).to_int()));
+        uhd::time_spec_t time_last_pps = usrp->get_time_last_pps(0);
+        std::cout << "USRP time: "
+            << (boost::format("%0.9f") % time_last_pps.get_real_secs())
+            << std::endl;
+        std::cout << "GPSDO time: "
+            << (boost::format("%0.9f") % gps_time.get_real_secs()) << std::endl;
+        if (gps_time.get_real_secs() == time_last_pps.get_real_secs()) {
+            std::cout << std::endl
+                << "SUCCESS: USRP time synchronized to GPS time" << std::endl
+                << std::endl;
+        }
+        else {
+            std::cerr << std::endl
+                << "ERROR: Failed to synchronize USRP time to GPS time"
+                << std::endl
+                << std::endl;
+        }
+    }
+
+    else {
+        std::cout << "Not configured for non-internal/gpsdo sources yet!" << std::endl;
+    }
 
     uhd::rx_metadata_t md;
-	int rx_rate = static_cast<int>(round(usrp->get_rx_rate()));
+	int rx_rate = static_cast<int>(round(usrp->get_rx_rate(channel_nums[0])));
 	std::cout << "======= Using 1 second buffers (x2) of " << rx_rate << " length." << std::endl;
-    std::vector<samp_type> buff[2]; // this is the temporary buffer, but now we have to make it 1 second since thats the file length
-	for (int i = 0; i < 2; i++){
-		buff[i].reserve(rx_rate);
-		buff[i].resize(rx_rate);
+	// First make the actual buffers for each channel, x2 
+    std::vector<std::vector<samp_type>> buffs[2]; // at the start, buffs[0] will be used, then buffs[1] after 1 second, and alternating thenceforth
+	buffs[0].resize(channel_nums.size());
+	buffs[1].resize(channel_nums.size());
+	for (int ch = 0; ch < channel_nums.size(); ch++){
+		// Reserve+resize buff1
+		buffs[0].at(ch).reserve(rx_rate);
+		buffs[0].at(ch).resize(rx_rate);
+		memset(&buffs[0].at(ch).front(), 0, sizeof(samp_type) * buffs[0].at(ch).size()); // let's zero it for debugging purposes
+		// Reserve+resize buff2
+		buffs[1].at(ch).reserve(rx_rate);
+		buffs[1].at(ch).resize(rx_rate);
+		memset(&buffs[1].at(ch).front(), 0, sizeof(samp_type) * buffs[1].at(ch).size()); // let's zero it for debugging purposes
 	}
+	// Now create the pointer vectors, one for current, one for waiting
+	std::vector<samp_type*> buff_ptrs[2];
+	buff_ptrs[0].resize(channel_nums.size());
+	buff_ptrs[1].resize(channel_nums.size()); // we will be writing the pointers during the loop, not here
+
 	int tIdx = 0; // used for buffer index, 0 or 1
 	int bufIdx = 0; // used to index into the vector
-	
-	// // ==== removing use of ofstream
-    // std::ofstream outfile;
-    // if (not null)
-        // outfile.open(file.c_str(), std::ofstream::binary);
-	// // ===============================
+
     bool overflow_message = true;
 
     // setup streaming
@@ -97,6 +163,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     stream_cmd.stream_now = false; // don't do immediately but sync to the second
 	uhd::time_spec_t time2send(usrp->get_time_now().get_full_secs() + 2, 0.0); // use time_now instead of pps?
     stream_cmd.time_spec = time2send;
+	printf("Streaming will start at %lld\n", time2send.get_full_secs());
     rx_stream->issue_stream_cmd(stream_cmd);
 
     typedef std::map<size_t, size_t> SizeMap;
@@ -119,12 +186,19 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
            and (time_requested == 0.0 or std::chrono::steady_clock::now() <= stop_time)) {
         const auto now = std::chrono::steady_clock::now();
 
+		// write the vector of pointers before receiving (only need to write the buff_ptrs at tIdx)	
+		for (size_t i = 0; i < channel_nums.size(); i++){
+			buff_ptrs[tIdx].at(i) = &buffs[tIdx].at(i).at(bufIdx);
+		}
+		// perform the receive
         size_t num_rx_samps =
-            rx_stream->recv(&buff[tIdx].at(bufIdx), samps_per_buff, md, 3.0, enable_size_map); // we edit to write at bufIdx
+            // rx_stream->recv(&buff[tIdx].at(bufIdx), samps_per_buff, md, 3.0, enable_size_map); // we edit to write at bufIdx
+			rx_stream->recv(buff_ptrs[tIdx], samps_per_buff, md, 3.0, enable_size_map); // we edit to write at bufIdx
 		
 		// =========== read the metadata
+		// std::cout << md.to_pp_string(false) << std::endl;
 		rxtime = md.time_spec;
-		printf("Sec : %lld, frac sec : %.11f\n", rxtime.get_full_secs(), rxtime.get_frac_secs());
+		printf("Sec : %lld, frac sec : %.11f, samples: %zd\n", rxtime.get_full_secs(), rxtime.get_frac_secs(), num_rx_samps);
 		// ============================
 		
         if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
@@ -141,7 +215,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
                            "  Dropped samples will not be written to the file.\n"
                            "  Please modify this example for your purposes.\n"
                            "  This message will not appear again.\n")
-                           % (usrp->get_rx_rate(channel) * sizeof(samp_type) / 1e6);
+                           % (usrp->get_rx_rate(channel_nums[0]) * sizeof(samp_type) / 1e6);
             }
             // continue;
 			break; // we want to ensure timing integrity, so if overflow let's end
@@ -164,21 +238,17 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 
         num_total_samps += num_rx_samps;
 
-		// // ========== removing use of ofstream 
-        // if (outfile.is_open()) {
-            // outfile.write((const char*)&buff.front(), num_rx_samps * sizeof(samp_type));
-        // }
-		// // ==============================
-
 		// ============ check buffers
 		printf("Buf: %d. W: %d\n", tIdx, bufIdx);
 		// update the new idx to write to
 		bufIdx = bufIdx + num_rx_samps;
 		if (bufIdx == rx_rate) // then move to next buffer
 		{
-			// start thread to write current buffer
-			std::thread t(save_to_file<samp_type>, folder, rxtime.get_full_secs(), buff[tIdx]);
-			t.detach();
+			// start thread to write current buffer, for each subfolder
+			for (int i = 0; i < folders.size(); i++){
+				std::thread t(save_to_file<samp_type>, folders.at(i), rxtime.get_full_secs(), buffs[tIdx].at(i));
+				t.detach();
+			}
 			
 			// update indices
 			tIdx = (tIdx + 1) % 2;
@@ -204,11 +274,6 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
     rx_stream->issue_stream_cmd(stream_cmd);
 
-	// // ==== removing use of ofstream
-    // if (outfile.is_open()) {
-        // outfile.close();
-    // }
-	// // =============================
 
     if (stats) {
         std::cout << std::endl;
@@ -278,6 +343,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 {
     // variables to be set by po
     std::string args, file, type, ant, subdev, ref, wirefmt, folder;
+	std::string channel_list, ant_list;
     size_t channel, total_num_samps, spb;
     double rate, freq, gain, bw, total_time, setup_time, lo_offset;
 
@@ -287,7 +353,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     desc.add_options()
         ("help", "help message")
         ("args", po::value<std::string>(&args)->default_value(""), "multi uhd device address args")
-        ("file", po::value<std::string>(&file)->default_value("usrp_samples.dat"), "name of the file to write binary samples to")
+        // ("file", po::value<std::string>(&file)->default_value("usrp_samples.dat"), "name of the file to write binary samples to")
         ("type", po::value<std::string>(&type)->default_value("short"), "sample type: double, float, or short")
         ("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive")
         ("duration", po::value<double>(&total_time)->default_value(0), "total number of seconds to receive")
@@ -298,9 +364,11 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("lo-offset", po::value<double>(&lo_offset)->default_value(0.0),
             "Offset for frontend LO in Hz (optional)")
         ("gain", po::value<double>(&gain), "gain for the RF chain")
-        ("ant", po::value<std::string>(&ant), "antenna selection")
+        // ("ant", po::value<std::string>(&ant), "antenna selection")
+		("ants", po::value<std::string>(&ant_list), "antenna selection, use in conjunction with --channels to specify ports: \"TX/RX\" or \"RX2\"(default)")
         ("subdev", po::value<std::string>(&subdev), "subdevice specification")
-        ("channel", po::value<size_t>(&channel)->default_value(0), "which channel to use")
+        // ("channel", po::value<size_t>(&channel)->default_value(0), "which channel to use")
+		("channels", po::value<std::string>(&channel_list)->default_value("0"), "which channel(s) to use (specify \"0\", \"1\", \"0,1\", etc)")
         ("bw", po::value<double>(&bw), "analog frontend filter bandwidth in Hz")
         ("ref", po::value<std::string>(&ref)->default_value("internal"), "reference source (internal, gpsdo, external, mimo)")
         ("wirefmt", po::value<std::string>(&wirefmt)->default_value("sc16"), "wire format (sc8, sc16 or s16)")
@@ -327,13 +395,16 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     if (vm.count("help")) {
         std::cout << boost::format("UHD RX samples to file %s") % desc << std::endl;
         std::cout << std::endl
-                  << "This application streams data from a single channel of a USRP "
-                     "device to multiple 1 second files.\n"
+                  << "This application streams data from multiple channels of a USRP "
+                     "device to multiple 1 second files. Combination examples:\n"
+					 "-- channels 0,1 --ants TX/RX,RX2 \n"
+					 "will use channel 0 (usually left half of USRP) with TX/RX port, and channel 1 (right half) with RX2 port.\n"
+					 "If --ants is not specified, all channels default to the RX2 port.\n"
                   << std::endl;
         return ~0;
     }
 
-    // create directory if needed
+    // create outer directory if needed
     boost::filesystem::create_directories(folder.c_str());
     // check if it exists
     if (boost::filesystem::is_directory(folder.c_str())) {
@@ -372,142 +443,125 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 
     std::cout << boost::format("Using Device: %s") % usrp->get_pp_string() << std::endl;
 
-    // set the sample rate
-    if (rate <= 0.0) {
-        std::cerr << "Please specify a valid sample rate" << std::endl;
-        return ~0;
-    }
-    std::cout << boost::format("Setting RX Rate: %f Msps...") % (rate / 1e6) << std::endl;
-    usrp->set_rx_rate(rate, channel);
-    std::cout << boost::format("Actual RX Rate: %f Msps...")
-                     % (usrp->get_rx_rate(channel) / 1e6)
-              << std::endl
-              << std::endl;
-
-    // set the center frequency
-    if (vm.count("freq")) { // with default of 0.0 this will always be true
-        std::cout << boost::format("Setting RX Freq: %f MHz...") % (freq / 1e6)
-                  << std::endl;
-        std::cout << boost::format("Setting RX LO Offset: %f MHz...") % (lo_offset / 1e6)
-                  << std::endl;
-        uhd::tune_request_t tune_request(freq, lo_offset);
-        if (vm.count("int-n"))
-            tune_request.args = uhd::device_addr_t("mode_n=integer");
-        usrp->set_rx_freq(tune_request, channel);
-        std::cout << boost::format("Actual RX Freq: %f MHz...")
-                         % (usrp->get_rx_freq(channel) / 1e6)
-                  << std::endl
-                  << std::endl;
-    }
-
-    // set the rf gain
-    if (vm.count("gain")) {
-        std::cout << boost::format("Setting RX Gain: %f dB...") % gain << std::endl;
-        usrp->set_rx_gain(gain, channel);
-        std::cout << boost::format("Actual RX Gain: %f dB...")
-                         % usrp->get_rx_gain(channel)
-                  << std::endl
-                  << std::endl;
-    }
-
-    // set the IF filter bandwidth
-    if (vm.count("bw")) {
-        std::cout << boost::format("Setting RX Bandwidth: %f MHz...") % (bw / 1e6)
-                  << std::endl;
-        usrp->set_rx_bandwidth(bw, channel);
-        std::cout << boost::format("Actual RX Bandwidth: %f MHz...")
-                         % (usrp->get_rx_bandwidth(channel) / 1e6)
-                  << std::endl
-                  << std::endl;
-    }
-
-    // set the antenna
-    if (vm.count("ant"))
-        usrp->set_rx_antenna(ant, channel);
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(int64_t(1000 * setup_time)));
-
-    // check Ref and LO Lock detect
-    if (not vm.count("skip-lo")) {
-        check_locked_sensor(usrp->get_rx_sensor_names(channel),
-            "lo_locked",
-            [usrp, channel](const std::string& sensor_name) {
-                return usrp->get_rx_sensor(sensor_name, channel);
-            },
-            setup_time);
-        if (ref == "mimo") {
-            check_locked_sensor(usrp->get_mboard_sensor_names(0),
-                "mimo_locked",
-                [usrp](const std::string& sensor_name) {
-                    return usrp->get_mboard_sensor(sensor_name);
-                },
-                setup_time);
-        }
-        if (ref == "external") {
-            check_locked_sensor(usrp->get_mboard_sensor_names(0),
-                "ref_locked",
-                [usrp](const std::string& sensor_name) {
-                    return usrp->get_mboard_sensor(sensor_name);
-                },
-                setup_time);
-        }
-    }
-	
-	// adjust timing if using internal reference clocks
-	if (usrp->get_time_source(0) == "internal"){
-		std::cout << "========= Using internal clock. Adjusting USRP time to computer time." << std::endl;
-		auto now = std::chrono::system_clock::now().time_since_epoch();
-		// auto nowsecs = std::chrono::duration_cast<std::chrono::seconds>(now).count();
-		double nowsecs = std::chrono::duration<double>(now).count();
-		printf("========= Seconds since epoch = %.6f \n", nowsecs);
-		
-		uhd::time_spec_t t(nowsecs);
-		usrp->set_time_now(t);
-		printf("========= Time set now to %.6f\n", usrp->get_time_now().get_real_secs());
+	// pre-allocate some vectors
+	std::vector<std::string> folders;
+	// detect which channels to use
+    std::vector<std::string> channel_strings;
+    std::vector<size_t> channel_nums;
+    boost::split(channel_strings, channel_list, boost::is_any_of("\"',"));
+	// check that antenna specification matches channel specification (in terms of length)
+	std::vector<std::string> ant_strings;
+	if (vm.count("ants")){
+		boost::split(ant_strings, ant_list, boost::is_any_of("\"',"));
+		if (ant_strings.size() != channel_strings.size()){
+			throw std::runtime_error("Number of antennas specified does not correspond to number of channels specified. Either match the number or leave antenna specification blank to use RX2 for all channels.");
+		}
 	}
-
-    else if (usrp->get_time_source(0) == "gpsdo"){
-        std::cout << "Using time source " << usrp->get_time_source(0) << std::endl;
-        std::cout << "Using clock source " << usrp->get_clock_source(0) << std::endl;
-
-
-        // Set to GPS time
-        uhd::time_spec_t gps_time = uhd::time_spec_t(
-            int64_t(usrp->get_mboard_sensor("gps_time", 0).to_int()));
-        usrp->set_time_next_pps(gps_time + 1.0, 0);
-
-        // Wait for it to apply
-        // The wait is 2 seconds because N-Series has a known issue where
-        // the time at the last PPS does not properly update at the PPS edge
-        // when the time is actually set.
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-
-        // Check times
-        gps_time = uhd::time_spec_t(
-            int64_t(usrp->get_mboard_sensor("gps_time", 0).to_int()));
-        uhd::time_spec_t time_last_pps = usrp->get_time_last_pps(0);
-        std::cout << "USRP time: "
-            << (boost::format("%0.9f") % time_last_pps.get_real_secs())
-            << std::endl;
-        std::cout << "GPSDO time: "
-            << (boost::format("%0.9f") % gps_time.get_real_secs()) << std::endl;
-        if (gps_time.get_real_secs() == time_last_pps.get_real_secs()) {
-            std::cout << std::endl
-                << "SUCCESS: USRP time synchronized to GPS time" << std::endl
-                << std::endl;
-        }
-        else {
-            std::cerr << std::endl
-                << "ERROR: Failed to synchronize USRP time to GPS time"
-                << std::endl
-                << std::endl;
-        }
-    }
-
-    else {
-        std::cout << "Not configured for non-internal/gpsdo sources yet!" << std::endl;
-    }
 	
+	// loop over the channels specified
+    for (size_t ch = 0; ch < channel_strings.size(); ch++) {
+        size_t channel = std::stoi(channel_strings[ch]);
+        if (channel >= usrp->get_rx_num_channels()) {
+            throw std::runtime_error("Invalid channel(s) specified.");
+        } else{
+            channel_nums.push_back(channel);
+		}
+		
+		// everything else is inside this loop, since they reference a channel
+		// set the antenna for each channel
+		if (vm.count("ants")){
+			usrp->set_rx_antenna(ant_strings[ch], channel);
+		}
+		std::cout << "Using channel " << channel_strings[ch] << " with antenna " << usrp->get_rx_antenna(channel) << std::endl;
+		
+		// create a subfolder for the channel
+		std::string subfolder = folder + "\\" + channel_strings[ch];
+		folders.push_back(subfolder);
+		boost::filesystem::create_directories(subfolder);
+		// check if it exists
+		if (boost::filesystem::is_directory(subfolder.c_str())) {
+			std::cout << "Data folder at " << subfolder << " has been created/exists. Proceeding..." << std::endl;
+		}
+		
+		// set the sample rate for each channel
+		if (rate <= 0.0) {
+			std::cerr << "Please specify a valid sample rate" << std::endl;
+			return ~0;
+		}
+		std::cout << boost::format("Setting RX Rate: %f Msps...") % (rate / 1e6) << std::endl;
+		usrp->set_rx_rate(rate, channel);
+		std::cout << boost::format("Actual RX Rate: %f Msps...")
+						 % (usrp->get_rx_rate(channel) / 1e6)
+				  << std::endl
+				  << std::endl;
+				  
+		// set the center frequency
+		if (vm.count("freq")) { // with default of 0.0 this will always be true
+			std::cout << boost::format("Setting RX Freq: %f MHz...") % (freq / 1e6)
+					  << std::endl;
+			std::cout << boost::format("Setting RX LO Offset: %f MHz...") % (lo_offset / 1e6)
+					  << std::endl;
+			uhd::tune_request_t tune_request(freq, lo_offset);
+			if (vm.count("int-n"))
+				tune_request.args = uhd::device_addr_t("mode_n=integer");
+			usrp->set_rx_freq(tune_request, channel);
+			std::cout << boost::format("Actual RX Freq: %f MHz...")
+							 % (usrp->get_rx_freq(channel) / 1e6)
+					  << std::endl
+					  << std::endl;
+		}
+		
+		// set the rf gain
+		if (vm.count("gain")) {
+			std::cout << boost::format("Setting RX Gain: %f dB...") % gain << std::endl;
+			usrp->set_rx_gain(gain, channel);
+			std::cout << boost::format("Actual RX Gain: %f dB...")
+							 % usrp->get_rx_gain(channel)
+					  << std::endl
+					  << std::endl;
+		}
+
+		// set the IF filter bandwidth
+		if (vm.count("bw")) {
+			std::cout << boost::format("Setting RX Bandwidth: %f MHz...") % (bw / 1e6)
+					  << std::endl;
+			usrp->set_rx_bandwidth(bw, channel);
+			std::cout << boost::format("Actual RX Bandwidth: %f MHz...")
+							 % (usrp->get_rx_bandwidth(channel) / 1e6)
+					  << std::endl
+					  << std::endl;
+		}
+		
+		std::this_thread::sleep_for(std::chrono::milliseconds(int64_t(1000 * setup_time)));
+
+		// check Ref and LO Lock detect
+		if (not vm.count("skip-lo")) {
+			check_locked_sensor(usrp->get_rx_sensor_names(channel),
+				"lo_locked",
+				[usrp, channel](const std::string& sensor_name) {
+					return usrp->get_rx_sensor(sensor_name, channel);
+				},
+				setup_time);
+			if (ref == "mimo") {
+				check_locked_sensor(usrp->get_mboard_sensor_names(0),
+					"mimo_locked",
+					[usrp](const std::string& sensor_name) {
+						return usrp->get_mboard_sensor(sensor_name);
+					},
+					setup_time);
+			}
+			if (ref == "external") {
+				check_locked_sensor(usrp->get_mboard_sensor_names(0),
+					"ref_locked",
+					[usrp](const std::string& sensor_name) {
+						return usrp->get_mboard_sensor(sensor_name);
+					},
+					setup_time);
+			}
+		}
+		
+    } // end of channel loop
+
 	// check that samples per buffer is a divisor of sample rate
 	if (static_cast<int>(rate) % spb != 0)
 	{
@@ -526,11 +580,10 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     (usrp,                        \
         format,                   \
         wirefmt,                  \
-        channel,                  \
-        file,                     \
+        channel_nums,             \
         spb,                      \
         total_num_samps,          \
-        folder,                   \
+        folders,                   \
         total_time,               \
         bw_summary,               \
         stats,                    \
