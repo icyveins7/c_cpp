@@ -266,7 +266,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 
 
         // Sleep
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::this_thread::sleep_for(std::chrono::seconds(60));
     }
 
     // print NMEA strings
