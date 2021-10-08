@@ -23,6 +23,12 @@
 #include <iostream>
 #include <thread>
 
+#ifdef linux
+const char pathsplit = '/';
+#else
+const char pathsplit = '\\';
+#endif
+
 namespace po = boost::program_options;
 
 static bool stop_signal_called = false;
@@ -35,7 +41,7 @@ template <typename samp_type>
 void save_to_file(const std::string& folder, long long int second, std::vector<samp_type> &recdata)
 {
 	char filename[512];
-	snprintf(filename, 512, "%s\\%lld.bin", folder.c_str(), second);
+	snprintf(filename, 512, "%s%c%lld.bin", folder.c_str(), pathsplit, second);
     // printf("Writing to %s\n", filename);
 	
 	FILE *fp = fopen(filename, "wb");
@@ -178,6 +184,9 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 	// metadata holding
 	uhd::time_spec_t rxtime;
 	
+	// counter of numFiles so far
+	int64_t numFilesWritten = 0;
+	
     // Run this loop until either time expired (if a duration was given), until
     // the requested number of samples were collected (if such a number was
     // given), or until Ctrl-C was pressed.
@@ -198,7 +207,10 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 		// =========== read the metadata
 		// std::cout << md.to_pp_string(false) << std::endl;
 		rxtime = md.time_spec;
-		printf("Sec : %lld, frac sec : %.11f, samples: %zd\n", rxtime.get_full_secs(), rxtime.get_frac_secs(), num_rx_samps);
+//		printf("Sec : %lld, frac sec : %.11f, samples: %zd\n", rxtime.get_full_secs(), rxtime.get_frac_secs(), num_rx_samps);
+//		printf("Tick Count: %ld. \n", rxtime.get_tick_count(200e6));
+//        uhd::time_spec_t timenow = usrp->get_time_now();
+//        printf("Time from USRP: %lld, frac sec: %.11f\n", timenow.get_full_secs(), timenow.get_frac_secs()); // this line shows that the TwinRX appears to be doubling the duration (maybe because two DSPs and they added by accident? either way, using the metadata will be incorrect for the twinRX)
 		// ============================
 		
         if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
@@ -246,13 +258,17 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 		{
 			// start thread to write current buffer, for each subfolder
 			for (int i = 0; i < folders.size(); i++){
-				std::thread t(save_to_file<samp_type>, folders.at(i), rxtime.get_full_secs(), buffs[tIdx].at(i));
+//				std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), rxtime.get_full_secs(), std::ref(buffs[tIdx].at(i))); // since rxtime is not accurate for twinRX, we revert to just a plain counter based on start timing
+                std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), time2send.get_full_secs() + numFilesWritten, std::ref(buffs[tIdx].at(i))); 
+
 				t.detach();
 			}
 			
 			// update indices
 			tIdx = (tIdx + 1) % 2;
 			bufIdx = 0;
+			
+			numFilesWritten += 1;
 		}
 		// ==========================
 		
@@ -400,6 +416,17 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 					 "-- channels 0,1 --ants TX/RX,RX2 \n"
 					 "will use channel 0 (usually left half of USRP) with TX/RX port, and channel 1 (right half) with RX2 port.\n"
 					 "If --ants is not specified, all channels default to the RX2 port.\n"
+					 "For TwinRXs, the subdev must be specified. Typically, you can just add --subdev \"A:0 A:1 B:0 B:1\"\n"
+					 "and then assign the channels you would like. For example,\n"
+					 "To record on RF A:RX1 and RF B:RX 2, specify --subdev \"A:0 A:1 B:0 B:1\" --channels 0,3 --ants RX1,RX2\n"
+ 					 "To record on RF A:RX2 and RF B:RX 2, specify --subdev \"A:0 A:1 B:0 B:1\" --channels 1,3 --ants RX2,RX2\n"
+ 					 "To record on RF A:RX1 and RF A:RX 2, specify --subdev \"A:0 A:1 B:0 B:1\" --channels 0,1 --ants RX1,RX2\n"
+					 "To record on all 4 ports, specify --subdev \"A:0 A:1 B:0 B:1\" --channels 0,1,2,3 --ants RX1,RX2,RX1,RX2\n"
+					 "In theory, the subdev specifies the available DSPs, A:0 A:1 corresponding to the first daughterboard and \n"
+					 "B:0 B:1 corresponding to the second daughterboard. The channels argument then references the subdevs available.\n"
+					 "Hence, one can also record on RF A:RX2, RF B:RX2 by doing\n"
+					 "--subdev \"A:0 B:0\" --channels 0,1 --ants RX2,RX2\n"
+					 "It is up to you to choose how you want to specify the arguments. They should make no difference in the end.\n"
                   << std::endl;
         return ~0;
     }
@@ -475,7 +502,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 		std::cout << "Using channel " << channel_strings[ch] << " with antenna " << usrp->get_rx_antenna(channel) << std::endl;
 		
 		// create a subfolder for the channel
-		std::string subfolder = folder + "\\" + channel_strings[ch];
+		std::string subfolder = folder + pathsplit + channel_strings[ch];
 		folders.push_back(subfolder);
 		boost::filesystem::create_directories(subfolder);
 		// check if it exists
