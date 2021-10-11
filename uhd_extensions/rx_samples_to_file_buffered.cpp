@@ -441,6 +441,14 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         std::cout << "Failed to create folder at " << folder << ", exiting!" << std::endl;
         return 1;
     }
+    // write a log file
+    std::string logpath = folder + pathsplit + "log.txt";
+    FILE *flog = fopen(logpath.c_str(), "w");
+    for (int i = 1; i < argc; i++){
+        fprintf(flog, "%s ",  argv[i]);
+    }
+    fprintf(flog, "\n");
+    fclose(flog);
 
     bool bw_summary             = vm.count("progress") > 0;
     bool stats                  = vm.count("stats") > 0;
