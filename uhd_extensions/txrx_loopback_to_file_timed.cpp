@@ -22,6 +22,12 @@
 #include <iostream>
 
 namespace po = boost::program_options;
+/***********************************************************************
+ * Menu function declarations (at bottom)
+ **********************************************************************/
+void menu(std::string &folder);
+void folderMenu(std::string &folder);
+
 
 /***********************************************************************
  * Signal handlers
@@ -55,34 +61,34 @@ std::string generate_out_filename(
  * transmit_worker function
  * A function to be used as a boost::thread_group thread for transmitting
  **********************************************************************/
-void transmit_worker(std::vector<std::complex<float>> buff,
-    wave_table_class wave_table,
-    uhd::tx_streamer::sptr tx_streamer,
-    uhd::tx_metadata_t metadata,
-    size_t step,
-    size_t index,
-    int num_channels)
-{
-    std::vector<std::complex<float>*> buffs(num_channels, &buff.front());
+//void transmit_worker(std::vector<std::complex<float>> buff,
+//    wave_table_class wave_table,
+//    uhd::tx_streamer::sptr tx_streamer,
+//    uhd::tx_metadata_t metadata,
+//    size_t step,
+//    size_t index,
+//    int num_channels)
+//{
+//    std::vector<std::complex<float>*> buffs(num_channels, &buff.front());
 
-    // send data until the signal handler gets called
-    while (not stop_signal_called) {
-        // fill the buffer with the waveform
-        for (size_t n = 0; n < buff.size(); n++) {
-            buff[n] = wave_table(index += step);
-        }
+//    // send data until the signal handler gets called
+//    while (not stop_signal_called) {
+//        // fill the buffer with the waveform
+//        for (size_t n = 0; n < buff.size(); n++) {
+//            buff[n] = wave_table(index += step);
+//        }
 
-        // send the entire contents of the buffer
-        tx_streamer->send(buffs, buff.size(), metadata);
+//        // send the entire contents of the buffer
+//        tx_streamer->send(buffs, buff.size(), metadata);
 
-        metadata.start_of_burst = false;
-        metadata.has_time_spec  = false;
-    }
+//        metadata.start_of_burst = false;
+//        metadata.has_time_spec  = false;
+//    }
 
-    // send a mini EOB packet
-    metadata.end_of_burst = true;
-    tx_streamer->send("", 0, metadata);
-}
+//    // send a mini EOB packet
+//    metadata.end_of_burst = true;
+//    tx_streamer->send("", 0, metadata);
+//}
 
 
 /***********************************************************************
@@ -190,8 +196,8 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 int UHD_SAFE_MAIN(int argc, char* argv[])
 {
     // transmit variables to be set by po
-    std::string tx_args, wave_type, tx_ant, tx_subdev, ref, otw, tx_channels;
-    double tx_rate, tx_freq, tx_gain, wave_freq, tx_bw;
+    std::string tx_args, tx_ant, tx_subdev, ref, otw, tx_channels;
+    double tx_rate, tx_freq, tx_gain, tx_bw;
     float ampl;
 
     // receive variables to be set by po
@@ -430,30 +436,11 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     uhd::stream_args_t stream_args("fc32", otw);
     stream_args.channels             = tx_channel_nums;
     uhd::tx_streamer::sptr tx_stream = tx_usrp->get_tx_stream(stream_args);
-
-    // TODO: create receive streamer here instead
-    
-
     
     // =========================== SET UP COMPLETE ====================================
     // Now we set up a menu here, for the streamer reuse
+    menu(folder);
     
-    int menu_i;
-    while(1){
-        printf("Select one of the following:\n"
-               "1) Print current USRP time\n"
-               "2) Add a transmit time\n"
-               "3) Toggle receive loopback\n"
-               "0) Begin transmission\n"
-               "Selection: ";
-        switch(menu_i){
-        
-        
-        }
-    
-    
-    }
-
     // allocate a buffer which we re-use for each channel
     if (spb == 0)
         spb = tx_stream->get_max_num_samps() * 10;
@@ -533,10 +520,10 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     std::cout << boost::format("Setting device timestamp to 0...") << std::endl;
     tx_usrp->set_time_now(uhd::time_spec_t(0.0));
 
-    // start transmit worker thread
-    boost::thread_group transmit_thread;
-    transmit_thread.create_thread(boost::bind(
-        &transmit_worker, buff, wave_table, tx_stream, md, step, index, num_channels));
+    // TODO :start transmit worker thread
+//    boost::thread_group transmit_thread;
+//    transmit_thread.create_thread(boost::bind(
+//        &transmit_worker, buff, wave_table, tx_stream, md, step, index, num_channels));
 
     // recv to file
     if (type == "double")
@@ -551,13 +538,13 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     else {
         // clean up transmit worker
         stop_signal_called = true;
-        transmit_thread.join_all();
+//        transmit_thread.join_all(); // TODO: re-enable after done
         throw std::runtime_error("Unknown type " + type);
     }
 
     // clean up transmit worker
     stop_signal_called = true;
-    transmit_thread.join_all();
+//    transmit_thread.join_all(); // TODO: re-enable after done
 
     // finished
     std::cout << std::endl << "Done!" << std::endl << std::endl;
@@ -565,7 +552,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 }
 
 
-void menu(std::string folder)
+void menu(std::string &folder)
 {
     int menu_i;
     bool loopWhile = true;
@@ -595,9 +582,7 @@ void menu(std::string folder)
             }
             case 2:
             {
-                
-                printf("Viewing folder contents:\n");
-                
+                folderMenu(folder);
                 break;
             }
             case 3:
@@ -629,35 +614,65 @@ void menu(std::string folder)
 
 }
 
-void folderMenu(std::string folder){
+void folderMenu(std::string &folder){
     bool loopWhile = true;
 
     boost::filesystem::path p(folder);
 
     std::vector<std::string> filepaths;
+    std::vector<std::string> txfilepaths; // the tx queue
+    std::vector<unsigned int> txtimes;
     for (boost::filesystem::directory_entry& x : boost::filesystem::directory_iterator(p)){
-        filepaths.push_back(x.path());
+        filepaths.push_back(x.path().string());
     }
+    printf("Folder contents:\n");
+    for (int i = 0; i < filepaths.size(); i++){
+        printf("%d: %s\n", i, filepaths.at(i).c_str());
+    }
+    printf("\n");
     
     int idx;
     unsigned int time;
     
     while(loopWhile){
-        printf("Folder contents:\n");
-        for (int i = 0; i < filepaths.size(); i++){
-            printf("%d: %s\n", i, filepaths.at(i).c_str());
-        }
-        printf("\n");
-        
-        printf("Add a file to the transmit queue in the following format:\n"
-               "(index) (time to transmit in UTC)\n"
-               "Example: '1 1649299502' takes file index 1 to transmit at UTC 1649299502 seconds.\n"
+        printf("Add a file to the transmit queue by specifying its index.\n"
+               "Example: '1' adds file index 1 to the queue\n"
                "Type '-1' to see the current transmit queue\n"
-               "Type '-2' to exit\n"
+               "Type '-2' to see the folder contents again\n"
+               "Type '-3' to exit\n"
                "Input: ");
-        scanf("%d %u", &idx, &time);
+        scanf("%d", &idx);
         
+        if (idx == -1){
+            printf("Current transmit queue:\n");
+            // TODO
+            
+        }
+        else if (idx == -2){
+            printf("Folder contents:\n");
+            for (int i = 0; i < filepaths.size(); i++){
+                printf("%d: %s\n", i, filepaths.at(i).c_str());
+            }
+            printf("\n");
+        }
+        else if (idx == -3){
+            printf("Exiting back to previous menu..\n");
+            loopWhile = false;
+            break;
+        }
+        else if ((idx >= 0) && (idx < filepaths.size())){ // file index
+            printf("Enter time to transmit: "); 
+            scanf("%u", &time);
+            
         
+            printf("Attaching %s to the queue at time %u.\n", filepaths.at(idx).c_str(), time);
+            txfilepaths.push_back(filepaths.at(idx));
+            txtimes.push_back(time);
+            
+        }
+        else{
+            printf("Invalid selection.\n");
+        }
     
     
     }
