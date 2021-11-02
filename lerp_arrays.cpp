@@ -72,6 +72,40 @@ int main(){
 		printf("yyq[%d] = %f\n", i, yyq.at(yyq.size()+i));
 	}
 	
+	// ========== Could technically pre-calculate gradients, and index into it?
+	ippe::vector<Ipp64f> grads(len-1);
+	// pre-calculate gradients across entire set
+	for (int i = 0; i < grads.size(); i++){
+		grads.at(i) = (yy.at(i+1) - yy.at(i)) / 1.0;
+	}
+	// start timer
+	auto t3 = std::chrono::high_resolution_clock::now();
+	
+	// run everything again
+	// divide first
+	ippsDivC_64f(xxq.data(), 1.0, divAns.data(), anslen);
+	// modf the whole array
+	ippsModf_64f(divAns.data(), intPart.data(), remPart.data(), anslen);
+	// convert to integers for indexing
+	ippsConvert_64f32s_Sfs(intPart.data(), indexes.data(), anslen, ippRndNear, 0);
+	// reuse the intPart which is not needed any more as the gradients vector
+	ippsZero_64f(gradients, anslen); // zero it out
+	for (int qi = 0; qi < anslen; qi++){
+		idx = indexes.at(qi);
+		if (idx >=0 && idx < len-1){ // don't index outside, we need to access the next point as well
+			gradients[qi] = grads.at(idx); // now simply use the value directly
+		}
+		yyq.at(qi) = yy.at(idx); // write the output value as well
+	}
+	// multiply gradients into the decimal part and add to output
+	ippsAddProduct_64f(remPart.data(), gradients, yyq.data(), anslen);
+	
+	// end timer
+	auto t4 = std::chrono::high_resolution_clock::now();
+	std::cout << "Took " << std::chrono::duration<double>(t4-t3).count() << " seconds" << std::endl;
+	
+	
+	
 	
 	return 0;
 }
