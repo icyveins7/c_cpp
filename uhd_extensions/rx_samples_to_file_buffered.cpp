@@ -69,7 +69,8 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     bool stats                  = false,
     bool null                   = false,
     bool enable_size_map        = false,
-    bool continue_on_bad_packet = false)
+    bool continue_on_bad_packet = false,
+    bool verbose                = false)
 {
     unsigned long long num_total_samps = 0;
     // create a receive streamer
@@ -251,7 +252,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
         num_total_samps += num_rx_samps;
 
 		// ============ check buffers
-		printf("Buf: %d. W: %d\n", tIdx, bufIdx);
+		if (verbose) {printf("Buf: %d. W: %d\n", tIdx, bufIdx);}
 		// update the new idx to write to
 		bufIdx = bufIdx + num_rx_samps;
 		if (bufIdx == rx_rate) // then move to next buffer
@@ -396,6 +397,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("continue", "don't abort on a bad packet")
         ("skip-lo", "skip checking LO lock status")
         ("int-n", "tune USRP with integer-N tuning")
+        ("verbose", "turn on verbose reporting")
 		("folder", po::value<std::string>(&folder)->default_value(""), "path to write files to (will be created if it doesn't exist)")
     ;
 	
@@ -413,7 +415,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         std::cout << std::endl
                   << "This application streams data from multiple channels of a USRP "
                      "device to multiple 1 second files. Combination examples:\n"
-					 "-- channels 0,1 --ants TX/RX,RX2 \n"
+					 "--channels 0,1 --ants TX/RX,RX2 \n"
 					 "will use channel 0 (usually left half of USRP) with TX/RX port, and channel 1 (right half) with RX2 port.\n"
 					 "If --ants is not specified, all channels default to the RX2 port.\n"
 					 "For TwinRXs, the subdev must be specified. Typically, you can just add --subdev \"A:0 A:1 B:0 B:1\"\n"
@@ -455,6 +457,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     bool null                   = vm.count("null") > 0;
     bool enable_size_map        = vm.count("sizemap") > 0;
     bool continue_on_bad_packet = vm.count("continue") > 0;
+    bool verbose                = vm.count("verbose") > 0;
 
     if (enable_size_map)
         std::cout << "Packet size tracking enabled - will only recv one packet at a time!"
@@ -624,7 +627,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         stats,                    \
         null,                     \
         enable_size_map,          \
-        continue_on_bad_packet)
+        continue_on_bad_packet,   \
+        verbose)
     // recv to file
     if (wirefmt == "s16") {
         if (type == "double")
