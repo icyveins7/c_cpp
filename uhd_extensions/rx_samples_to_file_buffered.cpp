@@ -69,7 +69,6 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     bool stats                  = false,
     bool null                   = false,
     bool enable_size_map        = false,
-    bool continue_on_bad_packet = false,
     bool verbose                = false)
 {
     unsigned long long num_total_samps = 0;
@@ -235,11 +234,12 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
         }
         if (md.error_code != uhd::rx_metadata_t::ERROR_CODE_NONE) {
             std::string error = str(boost::format("Receiver error: %s") % md.strerror());
-            if (continue_on_bad_packet) {
-                std::cerr << error << std::endl;
-                continue;
-            } else
-                throw std::runtime_error(error);
+//            if (continue_on_bad_packet) {
+//                std::cerr << error << std::endl;
+//                continue;
+//            } else
+//                throw std::runtime_error(error);
+            break; // again, ensure timing integrity, always break
         }
 
         if (enable_size_map) {
@@ -627,28 +627,30 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         stats,                    \
         null,                     \
         enable_size_map,          \
-        continue_on_bad_packet,   \
         verbose)
     // recv to file
-    if (wirefmt == "s16") {
-        if (type == "double")
-            recv_to_file<double> recv_to_file_args("f64");
-        else if (type == "float")
-            recv_to_file<float> recv_to_file_args("f32");
-        else if (type == "short")
-            recv_to_file<short> recv_to_file_args("s16");
-        else
-            throw std::runtime_error("Unknown type " + type);
-    } else {
-        if (type == "double")
-            recv_to_file<std::complex<double>> recv_to_file_args("fc64");
-        else if (type == "float")
-            recv_to_file<std::complex<float>> recv_to_file_args("fc32");
-        else if (type == "short")
-            recv_to_file<std::complex<short>> recv_to_file_args("sc16");
-        else
-            throw std::runtime_error("Unknown type " + type);
-    }
+    
+    do{
+        if (wirefmt == "s16") {
+            if (type == "double")
+                recv_to_file<double> recv_to_file_args("f64");
+            else if (type == "float")
+                recv_to_file<float> recv_to_file_args("f32");
+            else if (type == "short")
+                recv_to_file<short> recv_to_file_args("s16");
+            else
+                throw std::runtime_error("Unknown type " + type);
+        } else {
+            if (type == "double")
+                recv_to_file<std::complex<double>> recv_to_file_args("fc64");
+            else if (type == "float")
+                recv_to_file<std::complex<float>> recv_to_file_args("fc32");
+            else if (type == "short")
+                recv_to_file<std::complex<short>> recv_to_file_args("sc16");
+            else
+                throw std::runtime_error("Unknown type " + type);
+        }
+    }while(continue_on_bad_packet);
 
     // finished
     std::cout << std::endl << "Done!" << std::endl << std::endl;
