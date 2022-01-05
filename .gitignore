@@ -3,3 +3,4 @@
 *.db
 *.dat
 *.bin
+uhd_extensions/bin
