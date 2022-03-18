@@ -266,6 +266,10 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 
 
         // Sleep
+        if (aligned && locked)
+        {
+            break;
+        }
         std::this_thread::sleep_for(std::chrono::seconds(60));
     }
 
