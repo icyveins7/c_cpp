@@ -38,20 +38,33 @@ void sig_int_handler(int)
 }
 
 template <typename samp_type>
-void save_to_file(const std::string& folder, long long int second, std::vector<samp_type> &recdata)
+void save_to_file(const std::string& folder, long long int second, std::vector<samp_type> &recdata, double threshold)
 {
 	char filename[512];
 	snprintf(filename, 512, "%s%c%lld.bin", folder.c_str(), pathsplit, second);
     // printf("Writing to %s\n", filename);
 	
-	FILE *fp = fopen(filename, "wb");
-	if (fp != NULL)
-	{
-		fwrite(recdata.data(), sizeof(samp_type), recdata.size(), fp);
-		fclose(fp);
-		
-		printf("Wrote %s.\n", filename);
-	}
+    bool toWrite = false;
+    if (threshold > 0)
+    {
+        // check if any values satisfy threshold
+        toWrite = std::any_of(recdata.cbegin(), recdata.cend(), [threshold](samp_type val){return static_cast<double>(std::abs(val)) > threshold;});
+    }
+    else{
+        toWrite = true; // if threshold is 0, always write (default behaviour)
+    }
+    
+    if (toWrite)
+    {
+        FILE *fp = fopen(filename, "wb");
+        if (fp != NULL)
+        {
+            fwrite(recdata.data(), sizeof(samp_type), recdata.size(), fp);
+            fclose(fp);
+            
+            printf("Wrote %s.\n", filename);
+        }
+    }
 	
 }
 
@@ -64,6 +77,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     size_t samps_per_buff,
     unsigned long long num_requested_samples,
     std::vector<std::string> &folders,
+    double threshold            = 0,
     double time_requested       = 0.0,
     bool bw_summary             = false,
     bool stats                  = false,
@@ -259,8 +273,8 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 		{
 			// start thread to write current buffer, for each subfolder
 			for (int i = 0; i < folders.size(); i++){
-//				std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), rxtime.get_full_secs(), std::ref(buffs[tIdx].at(i))); // since rxtime is not accurate for twinRX, we revert to just a plain counter based on start timing
-                std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), time2send.get_full_secs() + numFilesWritten, std::ref(buffs[tIdx].at(i))); 
+//				std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), rxtime.get_full_secs(), std::ref(buffs[tIdx].at(i)), threshold); // since rxtime is not accurate for twinRX, we revert to just a plain counter based on start timing
+                std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), time2send.get_full_secs() + numFilesWritten, std::ref(buffs[tIdx].at(i)), threshold); 
 
 				t.detach();
 			}
@@ -363,6 +377,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 	std::string channel_list, ant_list;
     size_t channel, total_num_samps, spb;
     double rate, freq, gain, bw, total_time, setup_time, lo_offset;
+    double threshold;
 
     // setup the program options
     po::options_description desc("Allowed options");
@@ -399,6 +414,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("int-n", "tune USRP with integer-N tuning")
         ("verbose", "turn on verbose reporting")
 		("folder", po::value<std::string>(&folder)->default_value(""), "path to write files to (will be created if it doesn't exist)")
+        ("threshold", po::value<double>(&threshold)->default_value(0), "amplitude threshold before writing to disk")
     ;
 	
 	
@@ -621,7 +637,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         channel_nums,             \
         spb,                      \
         total_num_samps,          \
-        folders,                   \
+        folders,                  \
+        threshold,                \
         total_time,               \
         bw_summary,               \
         stats,                    \
