@@ -4,3 +4,4 @@
 *.dat
 *.bin
 uhd_extensions/bin
+gnuradio_graphs/*.py
