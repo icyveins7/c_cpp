@@ -9,8 +9,11 @@ int main(){
 	Ipp32f *data1 = ippsMalloc_32f_L(len);
 	Ipp32f *data2 = ippsMalloc_32f_L(len);
 	Ipp32f *data3 = ippsMalloc_32f_L(len);
+	Ipp32fc *datafc1 = ippsMalloc_32fc_L(len);
+	Ipp32fc *datafc2 = ippsMalloc_32fc_L(len);
+	Ipp32fc *datafc3 = ippsMalloc_32fc_L(len);
 	std::cout<<"Allocated for length " << len << std::endl;
-	std::cout<<"All tests done in 32f (NOT 32fc), just as a gauge." << std::endl;
+	std::cout<<"All tests done in 32f or 32fc (not 64f/64fc), just as a gauge." << std::endl;
 	
 	// test add (we just run this to make sure the ipp library is warmed up / loaded / whatever
 	auto t1 = std::chrono::high_resolution_clock::now();
@@ -91,11 +94,28 @@ int main(){
 	auto ttone = std::chrono::duration_cast<std::chrono::duration<double>>(ttone2 - ttone1);
 	std::cout << "Took  " << ttone.count() << " seconds to complete tone" << std::endl;
 	
+	// test phase
+	auto tphase1 = std::chrono::high_resolution_clock::now();
+	ippsPhase_32fc(datafc1, data1, len);
+	auto tphase2 = std::chrono::high_resolution_clock::now();
+	auto tphase = std::chrono::duration_cast<std::chrono::duration<double>>(tphase2 - tphase1);
+	std::cout << "Took  " << tphase.count() << " seconds to complete ippsPhase_32fc" << std::endl;
+	
+	// test mul complex
+	tmul1 = std::chrono::high_resolution_clock::now();
+	ippsMul_32fc(datafc1, datafc2, datafc3, len);
+	tmul2 = std::chrono::high_resolution_clock::now();
+	tmul = std::chrono::duration_cast<std::chrono::duration<double>>(tmul2 - tmul1);
+	std::cout << "Took  " << tmul.count() << " seconds to complete ippsMul_32fc" << std::endl;
+		
 	
 	// cleanup
 	ippsFree(data1);
 	ippsFree(data2);
 	ippsFree(data3);
+	ippsFree(datafc1);
+	ippsFree(datafc2);
+	ippsFree(datafc3);
 	
 	return 0;
 }
