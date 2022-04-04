@@ -17,7 +17,7 @@
 
 struct ChannelSetting
 {
-    size_t channel = 0;
+    size_t channel = uhd::usrp::multi_usrp::ALL_CHANS;
     double rate = 0;
     double freq = 0;
     double lo_offset = 0;
@@ -26,31 +26,25 @@ struct ChannelSetting
     std::string ant = "RX2";
 };
 
-struct SettingsRxUSRP
+struct SettingsUSRP
 {
     std::string make_args = ""; // 1
     std::string subdev_args = ""; // 2
-    std::vector<std::string> channel_strings = {"0"}; // 3
-    std::string clock_source = "internal"; // 4
-    std::string time_source = "internal"; // 4
-    double global_rate = 0; // 5
-    std::vector<double> channel_rates; // 5
-    std::vector<double> get_rates; // 5 (returned)
-    double global_freq = 0; // 6
-    std::vector<double> channel_freqs; // 6
-    std::vector<double> get_freqs; // 6
+
+    std::string clock_source = "internal"; // 3
+    std::string time_source = "internal"; // 3
 
     // All channel specific settings
-    std::vector<ChannelSetting> chnlsettings;
+    std::vector<ChannelSetting> chnlsettings; // 4
 };
 
 /*
 A simple, standard function to initialise all common settings on a USRP receiver object.
-Use in conjunction with the settings struct above.
+Use in conjunction with the SettingsUSRP struct above.
 */
 void setupRxUSRP(
     uhd::usrp::multi_usrp::sptr rx_usrp,
-    SettingsRxUSRP settings
+    SettingsUSRP &settings
     )
 {
     // 1. Make
@@ -59,90 +53,106 @@ void setupRxUSRP(
     // 2. Set subdevice if not empty
     rx_usrp->set_rx_subdev_spec(settings.subdev_args);
 
-    // 3. Set channels to be used
-    std::vector<size_t> channel_nums; // TODO: redo this to just incorporate the channel settings directly ie freq, gain, filter bw, antenna
-    for (size_t ch = 0; ch < settings.channel_strings.size(); ch++) {
-        size_t chan = std::stoi(settings.channel_strings[ch]);
-        if (chan >= rx_usrp->get_rx_num_channels()) {
-            throw std::runtime_error("Invalid RX channel(s) specified.");
-        } else
-            channel_nums.push_back(chan);
-    }
-
-    // 4. Lock clock and time sources
+    // 3. Lock clock and time sources
     rx_usrp->set_clock_source(settings.clock_source);
     rx_usrp->set_time_source(settings.time_source);
 
-    // 5. Set sample rates
-    if (settings.global_rate != 0)
+    // 4. Channel specific settings
+    for (int i = 0; i < settings.chnlsettings.size(); i++)
     {
-        // Then set one for everything, this is the most common scenario
-        rx_usrp->set_rx_rate(settings.global_rate);
-        settings.get_rates.push_back(rx_usrp->get_rx_rate());
-    }
-    else
-    {
-        // Otherwise we set one for each channel
-        if (settings.channel_rates.size() != settings.channel_strings.size())
-        {
-            throw std::runtime_error(
-                "Invalid number of RX sample rates specified, expected " + 
-                std::to_string(settings.channel_strings.size()));
-        }
-        else
-        {
-            // Set all first
-            for (int i = 0; i < settings.channel_strings.size(); i++)
-            {
-                rx_usrp->set_rx_rate(
-                    settings.channel_rates.at(i),
-                    channel_nums.at(i)
-                );
-            }
-            // Then call the getters, in case later settings change the values of earlier ones
-            for (int i = 0; i < settings.channel_strings.size(); i++)
-            {
-                settings.get_rates.push_back(
-                    rx_usrp->get_rx_rate(channel_nums.at(i))
-                );
-            }
-        }
-    }
+        // 4a. Rate
+        rx_usrp->set_rx_rate(
+            settings.chnlsettings.at(i).rate,
+            settings.chnlsettings.at(i).channel);
 
-    // 6. Set centre frequencies, TODO: INCLUDE LO_OFFSETS
-    if (settings.global_freq != 0)
-    {
-        uhd::tune_request_t tune_request(settings.global_freq);
-        rx_usrp->set_rx_freq(tune_request);
-        settings.get_freqs.push_back(rx_usrp->get_rx_freq());
+        // 4b. Frequencies + LOs
+        uhd::tune_request_t tune_request(
+            settings.chnlsettings.at(i).freq,
+            settings.chnlsettings.at(i).lo_offset
+        );
+        rx_usrp->set_rx_freq(
+            tune_request,
+            settings.chnlsettings.at(i).channel);
+
+        // 4c. Gain
+        rx_usrp->set_rx_gain(
+            settings.chnlsettings.at(i).gain,
+            settings.chnlsettings.at(i).channel
+        );
+
+        // 4d. Filter BW (conditional setting)
+        if (settings.chnlsettings.at(i).bw != 0)
+        {
+            rx_usrp->set_rx_bandwidth(
+                settings.chnlsettings.at(i).bw,
+                settings.chnlsettings.at(i).channel
+            );
+        }
+
+        // 4e. Antenna
+        rx_usrp->set_rx_antenna(
+            settings.chnlsettings.at(i).ant,
+            settings.chnlsettings.at(i).channel
+        );
     }
-    else
+};
+
+
+/*
+A simple, standard function to initialise all common settings on a USRP transmitter object.
+Use in conjunction with the SettingsUSRP struct above.
+*/
+void setupTxUSRP(
+    uhd::usrp::multi_usrp::sptr tx_usrp,
+    SettingsUSRP &settings
+    )
+{
+    // 1. Make
+    tx_usrp = uhd::usrp::multi_usrp::make(settings.make_args);
+
+    // 2. Set subdevice if not empty
+    tx_usrp->set_tx_subdev_spec(settings.subdev_args);
+
+    // 3. Lock clock and time sources
+    tx_usrp->set_clock_source(settings.clock_source);
+    tx_usrp->set_time_source(settings.time_source);
+
+    // 4. Channel specific settings
+    for (int i = 0; i < settings.chnlsettings.size(); i++)
     {
-        // Otherwise we set one for each channel
-        if (settings.channel_rates.size() != settings.channel_strings.size())
+        // 4a. Rate
+        tx_usrp->set_tx_rate(
+            settings.chnlsettings.at(i).rate,
+            settings.chnlsettings.at(i).channel);
+
+        // 4b. Frequencies + LOs
+        uhd::tune_request_t tune_request(
+            settings.chnlsettings.at(i).freq,
+            settings.chnlsettings.at(i).lo_offset
+        );
+        tx_usrp->set_tx_freq(
+            tune_request,
+            settings.chnlsettings.at(i).channel);
+
+        // 4c. Gain
+        tx_usrp->set_tx_gain(
+            settings.chnlsettings.at(i).gain,
+            settings.chnlsettings.at(i).channel
+        );
+
+        // 4d. Filter BW (conditional setting)
+        if (settings.chnlsettings.at(i).bw != 0)
         {
-            throw std::runtime_error(
-                "Invalid number of RX centre frequencies specified, expected " + 
-                std::to_string(settings.channel_strings.size()));
+            tx_usrp->set_tx_bandwidth(
+                settings.chnlsettings.at(i).bw,
+                settings.chnlsettings.at(i).channel
+            );
         }
-        else
-        {
-            // Set all first
-            for (int i = 0; i < settings.channel_strings.size(); i++)
-            {
-                uhd::tune_request_t tune_request(settings.channel_freqs.at(i));
-                rx_usrp->set_rx_freq(
-                    settings.channel_freqs.at(i),
-                    channel_nums.at(i)
-                );
-            }
-            // Then call the getters, in case later settings change the values of earlier ones
-            for (int i = 0; i < settings.channel_strings.size(); i++)
-            {
-                settings.get_freqs.push_back(
-                    rx_usrp->get_rx_freq(channel_nums.at(i))
-                );
-            }
-        }
+
+        // 4e. Antenna
+        tx_usrp->set_tx_antenna(
+            settings.chnlsettings.at(i).ant,
+            settings.chnlsettings.at(i).channel
+        );
     }
 };
