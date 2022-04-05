@@ -17,7 +17,7 @@
 
 struct ChannelSetting
 {
-    size_t channel = uhd::usrp::multi_usrp::ALL_CHANS;
+    size_t channel = 0;
     double rate = 0;
     double freq = 0;
     double lo_offset = 0;
@@ -42,16 +42,17 @@ struct SettingsUSRP
 A simple, standard function to initialise all common settings on a USRP receiver object.
 Use in conjunction with the SettingsUSRP struct above.
 */
-void setupRxUSRP(
-    uhd::usrp::multi_usrp::sptr rx_usrp,
-    SettingsUSRP &settings
-    )
+uhd::usrp::multi_usrp::sptr setupRxUSRP(SettingsUSRP &settings)
 {
     // 1. Make
-    rx_usrp = uhd::usrp::multi_usrp::make(settings.make_args);
+    uhd::usrp::multi_usrp::sptr rx_usrp = uhd::usrp::multi_usrp::make(settings.make_args);
 
     // 2. Set subdevice if not empty
-    rx_usrp->set_rx_subdev_spec(settings.subdev_args);
+    if (settings.subdev_args.size() > 0)
+    {
+        rx_usrp->set_rx_subdev_spec(settings.subdev_args);
+    }
+    
 
     // 3. Lock clock and time sources
     rx_usrp->set_clock_source(settings.clock_source);
@@ -95,6 +96,8 @@ void setupRxUSRP(
             settings.chnlsettings.at(i).channel
         );
     }
+
+    return rx_usrp;
 };
 
 
@@ -102,13 +105,10 @@ void setupRxUSRP(
 A simple, standard function to initialise all common settings on a USRP transmitter object.
 Use in conjunction with the SettingsUSRP struct above.
 */
-void setupTxUSRP(
-    uhd::usrp::multi_usrp::sptr tx_usrp,
-    SettingsUSRP &settings
-    )
+uhd::usrp::multi_usrp::sptr setupTxUSRP(SettingsUSRP &settings)
 {
     // 1. Make
-    tx_usrp = uhd::usrp::multi_usrp::make(settings.make_args);
+    uhd::usrp::multi_usrp::sptr tx_usrp = uhd::usrp::multi_usrp::make(settings.make_args);
 
     // 2. Set subdevice if not empty
     tx_usrp->set_tx_subdev_spec(settings.subdev_args);
@@ -155,6 +155,8 @@ void setupTxUSRP(
             settings.chnlsettings.at(i).channel
         );
     }
+
+    return tx_usrp;
 };
 
 struct SettingsUSRP checkRxSettings(
