@@ -156,3 +156,73 @@ void setupTxUSRP(
         );
     }
 };
+
+struct SettingsUSRP checkRxSettings(
+    uhd::usrp::multi_usrp::sptr rx_usrp)
+{
+    struct SettingsUSRP settings;
+
+    // We ignore the make command
+    // Fill in the subdev
+    uhd::usrp::subdev_spec_t subdevspec = rx_usrp->get_rx_subdev_spec();
+    settings.subdev_args = subdevspec.to_string();
+
+    // Fill in the clock and time source
+    settings.clock_source = rx_usrp->get_clock_source(0);
+    settings.time_source = rx_usrp->get_time_source(0);
+
+    // Fill in the channel settings
+    for (int i = 0; i < subdevspec.size(); i++) // the subdev is actually a vector
+    {
+        struct ChannelSetting chnlsetting;
+        chnlsetting.channel = i;
+        chnlsetting.rate = rx_usrp->get_rx_rate(i);
+        chnlsetting.freq = rx_usrp->get_rx_freq(i);
+        // chnlsetting.lo_offset = rx_usrp->get_rx_lo_freq(, i); // as of now, seems like getting the LO is slightly more involved, so skipping
+        chnlsetting.gain = rx_usrp->get_rx_gain(i);
+        chnlsetting.bw = rx_usrp->get_rx_bandwidth(i);
+        chnlsetting.ant = rx_usrp->get_rx_antenna(i);
+
+        // Add to the vector
+        settings.chnlsettings.push_back(chnlsetting);
+    }
+
+
+    return settings;
+}
+
+struct SettingsUSRP checkTxSettings(
+    uhd::usrp::multi_usrp::sptr tx_usrp)
+{
+    struct SettingsUSRP settings;
+
+    // We ignore the make command
+    // Fill in the subdev
+    uhd::usrp::subdev_spec_t subdevspec = tx_usrp->get_tx_subdev_spec();
+    settings.subdev_args = subdevspec.to_string();
+
+    // Fill in the clock and time source
+    settings.clock_source = tx_usrp->get_clock_source(0);
+    settings.time_source = tx_usrp->get_time_source(0);
+
+    // Fill in the channel settings
+    for (int i = 0; i < subdevspec.size(); i++) // the subdev is actually a vector
+    {
+        struct ChannelSetting chnlsetting;
+        chnlsetting.channel = i;
+        chnlsetting.rate = tx_usrp->get_tx_rate(i);
+        chnlsetting.freq = tx_usrp->get_tx_freq(i);
+        // chnlsetting.lo_offset = tx_usrp->get_tx_lo_freq(, i); // as of now, seems like getting the LO is slightly more involved, so skipping
+        chnlsetting.gain = tx_usrp->get_tx_gain(i);
+        chnlsetting.bw = tx_usrp->get_tx_bandwidth(i);
+        chnlsetting.ant = tx_usrp->get_tx_antenna(i);
+
+        // Add to the vector
+        settings.chnlsettings.push_back(chnlsetting);
+    }
+
+
+    return settings;
+}
+
+
