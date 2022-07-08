@@ -93,6 +93,13 @@ int main(){
 	auto ttone2 = std::chrono::high_resolution_clock::now();
 	auto ttone = std::chrono::duration_cast<std::chrono::duration<double>>(ttone2 - ttone1);
 	std::cout << "Took  " << ttone.count() << " seconds to complete tone32f" << std::endl;
+
+	// test threshold
+	auto tthresh1 = std::chrono::high_resolution_clock::now();
+	ippsThreshold_LTVal_32f(data1, data2, len, 0.0f, 1.0f);
+	auto tthresh2 = std::chrono::high_resolution_clock::now();
+	auto tthresh = std::chrono::duration_cast<std::chrono::duration<double>>(tthresh2 - tthresh1);
+	std::cout << "Took  " << tthresh.count() << " seconds to complete Threshold_LTVal_32f" << std::endl;
 	
 	// test phase
 	auto tphase1 = std::chrono::high_resolution_clock::now();
@@ -111,18 +118,19 @@ int main(){
     // Ratios
     printf("Benchmark is Add_32f.\n");
     double benchmark = time_spana.count();
-    printf("Add_32f       : %.3f\n", time_spana.count()/benchmark);
-    printf("Round_32f     : %.3f\n", tround.count()/benchmark);
-    printf("Mul_32f       : %.3f\n", tmul.count()/benchmark);
-    printf("AddC_32f      : %.3f\n", time_spanac.count()/benchmark);
-    printf("MulC_32f      : %.3f\n", tmulc.count()/benchmark);
-    printf("Modf_32f      : %.3f\n", tmodf.count()/benchmark);
-    printf("Sin_32f_A24   : %.3f\n", tsin.count()/benchmark);
-    printf("Cos_32f_A24   : %.3f\n", tcos.count()/benchmark);
-    printf("SinCos_32f_A24: %.3f\n", tsincos.count()/benchmark);
-    printf("Tone_32f      : %.3f\n", ttone.count()/benchmark);
-    printf("Phase_32fc    : %.3f\n", tphase.count()/benchmark);
-    printf("Mul_32fc      : %.3f\n", tmulfc.count()/benchmark);
+    printf("Add_32f            : %.3f\n", time_spana.count()/benchmark);
+    printf("Round_32f          : %.3f\n", tround.count()/benchmark);
+    printf("Mul_32f            : %.3f\n", tmul.count()/benchmark);
+    printf("AddC_32f           : %.3f\n", time_spanac.count()/benchmark);
+    printf("MulC_32f           : %.3f\n", tmulc.count()/benchmark);
+    printf("Modf_32f           : %.3f\n", tmodf.count()/benchmark);
+    printf("Sin_32f_A24        : %.3f\n", tsin.count()/benchmark);
+    printf("Cos_32f_A24        : %.3f\n", tcos.count()/benchmark);
+    printf("SinCos_32f_A24     : %.3f\n", tsincos.count()/benchmark);
+    printf("Tone_32f           : %.3f\n", ttone.count()/benchmark);
+	printf("Threshold_LTVal_32f: %.3f\n", tthresh.count()/benchmark);
+    printf("Phase_32fc         : %.3f\n", tphase.count()/benchmark);
+    printf("Mul_32fc           : %.3f\n", tmulfc.count()/benchmark);
 	
 	// cleanup
 	ippsFree(data1);
