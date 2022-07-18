@@ -21,9 +21,9 @@ The rotation in question is meant to map the bit sequences to the next one in th
 10 -> 11
 
 Since the gray-coding induces only 1 bit flip each time, what remains is to find out which bit to flip.
-It turns out this is given by the AND of both bits
-AND == true -> bit 0 flips == XOR with 10 
-AND == false -> bit 1 flips == XOR with 01
+It turns out this is given by the XOR of both bits
+XOR == 0 -> bit 0 flips == XOR with 10 
+XOR == 1 -> bit 1 flips == XOR with 01
 */
 template<std::size_t SIZE>
 void gray_qpsk_rotate(std::array<uint32_t, SIZE> &bits, std::array<uint32_t, SIZE> &out)
@@ -31,10 +31,10 @@ void gray_qpsk_rotate(std::array<uint32_t, SIZE> &bits, std::array<uint32_t, SIZ
     uint32_t mask, tmp;
     for (int i = 0; i < SIZE; i++)
     {
-        tmp = _pext_u32(bits[i], 0x55555555) & _pext_u32(bits[i], 0xaaaaaaaa); // deposits to lower/rightmost 16 bits
+        tmp = _pext_u32(bits[i], 0x55555555) ^ _pext_u32(bits[i], 0xaaaaaaaa); // deposits to lower/rightmost 16 bits
         mask = 0;
-        mask = mask | _pdep_u32(tmp, 0xaaaaaaaa); // deposit the first bits
-        mask = mask | _pdep_u32(~tmp, 0x55555555); // deposit the second bits, which are the NOT of the first
+        mask = mask | _pdep_u32(tmp, 0x55555555); // deposit the first bits
+        mask = mask | _pdep_u32(~tmp, 0xaaaaaaaa); // deposit the second bits, which are the NOT of the first
 
         out[i] = bits[i] ^ mask;
     }
