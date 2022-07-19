@@ -1,4 +1,5 @@
-// compile with -march=native to enable the intrinsics
+// g++ twiddling.cpp -lippcore -lipps -o twiddling -march=native
+// cl twiddling.cpp ippcore.lib ipps.lib /EHsc /O2 /arch:AVX2
 
 #include <iostream>
 #include <immintrin.h>
@@ -85,14 +86,79 @@ void gray_qpsk_rotate64(uint64_t *bits, uint64_t *out, int length)
         mask = (bits[i] ^ (bits[i] >> 1)) & 0x5555555555555555;
         mask |= (~(mask << 1) & 0xaaaaaaaaaaaaaaaa);
 
-        // DEPRECATED. DO NOT USE THIS. ORDERS OF MAGNITUDE SLOWER.
-        // tmp = _pext_u64(bits[i], 0x5555555555555555) ^ _pext_u64(bits[i], 0xaaaaaaaaaaaaaaaa); // deposits to lower/rightmost 16 bits
-        // mask = 0;
-        // mask |= _pdep_u64(tmp, 0x5555555555555555); // deposit the first bits
-        // mask |= _pdep_u64(~tmp, 0xaaaaaaaaaaaaaaaa); // deposit the second bits, which are the NOT of the first
-
         out[i] = bits[i] ^ mask;
     }
+}
+
+inline uint8_t extractBitSequence(uint8_t *src, int len, int bitIdx)
+{
+    if (bitIdx > len*8){throw -1;}
+    else{
+        int sb = bitIdx / 8;
+        int sm = bitIdx % 8;
+        if (sb == len - 1){ return src[sb] << sm; }
+        else{ return (src[sb] << sm) | (src[sb+1] >> (8-sm)); }
+    }
+}
+
+std::vector<uint32_t> match_amble(uint8_t *src, int srclen, uint8_t *amble, int amblelen, uint8_t *amblemask)
+{
+    printf("Amblelen/masklen (in bytes) = %d\n", amblelen);
+
+    int amblebitlen = 0;
+    int iters = amblelen / 4;
+    int rem = amblelen % 4;
+    uint32_t *ambleptr;
+    for (int i = 0; i < iters; i++){
+        ambleptr = (uint32_t*)&amblemask[i*4];
+        amblebitlen += _mm_popcnt_u32(*ambleptr);
+    }
+    if (rem > 0)
+    {
+        uint32_t rembits = 0;
+        for (int i = 0; i < rem; i++)
+        {
+            rembits |= (amblemask[iters*4+i] << (3-i)*8);
+        }
+        amblebitlen += _mm_popcnt_u32(rembits);
+    }
+    printf("Amblelen/masklen (in bits) = %d\n", amblebitlen);
+
+    // Check how many we need to iterate
+    int numSearch = srclen*8 - amblebitlen + 1;
+    printf("Source is %d bits, search length is %d \n", srclen*8, numSearch);
+    int sb, sm;
+    uint8_t srcByte;
+    uint8_t err;
+    std::vector<uint32_t> errs(numSearch);
+    uint32_t xorout;
+
+    // Loop over the starting source bit
+    for (int s = 0; s < numSearch; s++)
+    {
+        sb = s / 8; // This is the starting byte
+        sm = s % 8; // This is the starting bit
+        err = 0;
+
+        // Internal loop over the the amble
+        for (int a = 0; a < amblelen; a++)
+        {
+            srcByte = src[sb]; // By default its just this
+            if (sm != 0) // If the bit shift is non-zero we must take part of the next byte
+            {
+                srcByte = (srcByte << sm) | (src[sb+1] >> (8-sm));
+            }
+
+            // Now compare this to the amble value
+            xorout = (srcByte ^ amble[a]) & amblemask[a]; // This leaves 1-bits in spots that don't match
+            err += _mm_popcnt_u32(xorout); // TODO: highly inefficient as we only occupy 8 out of 32 bits
+        }
+        errs.at(s) = err;
+
+    }
+
+    return errs;
+
 }
 
 /////////////////////////////////////////
@@ -113,6 +179,19 @@ int main(int argc, char *argv[])
         const uint32_t expected = 0b01001011010010110100101101001011;
         if (out == expected){printf("Verified.\n");}
         else{printf("Error.\n");}
+
+        // Test amble matching
+        uint8_t amblemask[1] = {0b11111100};
+
+        std::vector<uint32_t> amble_errs = match_amble(out8, 4, out8, 1, amblemask);
+
+        for (int i = 0; i < amble_errs.size(); i++){
+            printf("%d: %d errors.\n", i, amble_errs.at(i));
+            printf("%s\n", std::bitset<6>((out8[0] & amblemask[0]) >> 2).to_string().c_str());
+            printf("%s\n", std::bitset<6>(
+                (extractBitSequence(out8, 4, i) & amblemask[0]) >> 2
+                ).to_string().c_str());
+        }
     }
 
     {
