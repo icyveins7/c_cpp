@@ -417,7 +417,31 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("threshold", po::value<double>(&threshold)->default_value(0), "amplitude threshold before writing to disk")
     ;
 	
-	
+	// Wizard style for clueless users
+    if (argc == 1)
+    {
+        std::cout << "*** Wizard Mode ***" << std::endl;
+        std::cout << "If you would like to specify arguments yourself, please use --help to see the possible options." << std::endl;
+        std::cout << "This mode will only iterate through the common options." << std::endl;
+
+        int wiz_fs;
+        std::cout << "Sample rate: ";
+        std::cin >> wiz_fs;
+
+        double wiz_freq;
+        std::cout << "Centre frequency (Hz): ";
+        std::cin >> wiz_freq;
+
+        double wiz_gain;
+        std::cout << "Gain (dB): ";
+        std::cin >> wiz_gain;
+
+        std::string wiz_folder;
+        std::cout << "Output folder: ";
+        std::cin >> wiz_folder;
+
+        // TODO: Format argc and argv appropriately 
+    }
 	
 	
     // clang-format on
