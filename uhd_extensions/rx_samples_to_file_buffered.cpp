@@ -424,7 +424,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("verbose", "turn on verbose reporting")
 		("folder", po::value<std::string>(&folder)->default_value(""), "path to write files to (will be created if it doesn't exist)")
         ("threshold", po::value<double>(&threshold)->default_value(0), "amplitude threshold before writing to disk")
-        ("saturation-warning", po::value<double>(&saturation_warning)->default_value(31000), "threshold value for saturation warning (any sample whose abs value exceeds this will produce a warning)")
+        ("saturation-warning", po::value<double>(&saturation_warning)->default_value(0), "threshold value for saturation warning (any sample whose abs value exceeds this will produce a warning)")
     ;
 	
 	// Wizard style for clueless users
