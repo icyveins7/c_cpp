@@ -88,6 +88,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     unsigned long long num_total_samps = 0;
     // create a receive streamer
     uhd::stream_args_t stream_args(cpu_format, wire_format);
+    std::cout << "cpu_format: " << cpu_format << " wire_format: " << wire_format << std::endl;
     // std::vector<size_t> channel_nums;
     // channel_nums.push_back(channel);
     stream_args.channels             = channel_nums;
@@ -387,7 +388,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("help", "help message")
         ("args", po::value<std::string>(&args)->default_value(""), "multi uhd device address args")
         // ("file", po::value<std::string>(&file)->default_value("usrp_samples.dat"), "name of the file to write binary samples to")
-        ("type", po::value<std::string>(&type)->default_value("short"), "sample type: double, float, or short")
+        ("type", po::value<std::string>(&type)->default_value("short"), "sample type: double, float, short, or byte")
         ("nsamps", po::value<size_t>(&total_num_samps)->default_value(0), "total number of samples to receive")
         ("duration", po::value<double>(&total_time)->default_value(0), "total number of seconds to receive")
         ("time", po::value<double>(&total_time), "(DEPRECATED) will go away soon! Use --duration instead")
@@ -471,6 +472,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 					 "Hence, one can also record on RF A:RX2, RF B:RX2 by doing\n"
 					 "--subdev \"A:0 B:0\" --channels 0,1 --ants RX2,RX2\n"
 					 "It is up to you to choose how you want to specify the arguments. They should make no difference in the end.\n"
+                     "Channel-specific centre frequencies may be set in a similar comma-delimited manner. For example,"
+                     "we can set --channels 0,2 --freq 1.5e9,1.6e9 to use 1.5GHz for channel 0 and 1.6GHz for channel 2."
                   << std::endl;
         return ~0;
     }
@@ -702,6 +705,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
                 recv_to_file<std::complex<float>> recv_to_file_args("fc32");
             else if (type == "short")
                 recv_to_file<std::complex<short>> recv_to_file_args("sc16");
+            else if (type == "byte")
+                recv_to_file<std::complex<char>> recv_to_file_args("sc8");
             else
                 throw std::runtime_error("Unknown type " + type);
         }
