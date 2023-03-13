@@ -375,6 +375,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     // variables to be set by po
     std::string args, file, type, ant, subdev, ref, wirefmt, folder;
 	std::string channel_list, ant_list;
+    std::string freqstr_list;
     size_t channel, total_num_samps, spb;
     double rate, freq, gain, bw, total_time, setup_time, lo_offset;
     double threshold;
@@ -392,7 +393,8 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("time", po::value<double>(&total_time), "(DEPRECATED) will go away soon! Use --duration instead")
         ("spb", po::value<size_t>(&spb)->default_value(10000), "samples per buffer")
         ("rate", po::value<double>(&rate)->default_value(1e6), "rate of incoming samples")
-        ("freq", po::value<double>(&freq)->default_value(0.0), "RF center frequency in Hz")
+        // ("freq", po::value<double>(&freq)->default_value(0.0), "RF center frequency in Hz")
+        ("freq", po::value<std::string>(&freqstr_list)->default_value("0.0"), "RF center frequency in Hz")
         ("lo-offset", po::value<double>(&lo_offset)->default_value(0.0),
             "Offset for frontend LO in Hz (optional)")
         ("gain", po::value<double>(&gain), "gain for the RF chain")
@@ -535,6 +537,14 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
 			throw std::runtime_error("Number of antennas specified does not correspond to number of channels specified. Either match the number or leave antenna specification blank to use RX2 for all channels.");
 		}
 	}
+
+    // for channel-specific centre frequencies
+    std::vector<std::string> freq_strings;
+    std::vector<double> freq_vals;
+    boost::split(freq_strings, freqstr_list, boost::is_any_of("\"',"));
+    // ensure there's as many freq centres as there are channels specified
+    if (freq_strings.size() != channel_strings.size())
+        throw std::runtime_error("Number of centre frequencies does not correspond to number of channels specified.");
 	
 	// loop over the channels specified
     for (size_t ch = 0; ch < channel_strings.size(); ch++) {
@@ -544,6 +554,10 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         } else{
             channel_nums.push_back(channel);
 		}
+
+        // extract the frequency value and append to the vector for storage
+        freq = std::stod(freq_strings.at(ch));
+        freq_vals.push_back(freq);
 		
 		// everything else is inside this loop, since they reference a channel
 		// set the antenna for each channel
