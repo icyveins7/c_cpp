@@ -38,7 +38,7 @@ void sig_int_handler(int)
 }
 
 template <typename samp_type>
-void save_to_file(const std::string& folder, long long int second, std::vector<samp_type> &recdata, double threshold)
+void save_to_file(const std::string& folder, long long int second, std::vector<samp_type> &recdata, double threshold, double saturation_warning)
 {
 	char filename[512];
 	snprintf(filename, 512, "%s%c%lld.bin", folder.c_str(), pathsplit, second);
@@ -53,6 +53,11 @@ void save_to_file(const std::string& folder, long long int second, std::vector<s
     else{
         toWrite = true; // if threshold is 0, always write (default behaviour)
     }
+
+    // check for saturation if specified
+    if (saturation_warning > 0 && std::any_of(recdata.cbegin(), recdata.cend(), [saturation_warning](samp_type val){return static_cast<double>(std::abs(val)) > saturation_warning;}))
+        printf("Saturated samples found (> %.2f)", saturation_warning);
+
     
     if (toWrite)
     {
@@ -78,6 +83,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
     unsigned long long num_requested_samples,
     std::vector<std::string> &folders,
     double threshold            = 0,
+    double saturation_warning   = 0,
     double time_requested       = 0.0,
     bool bw_summary             = false,
     bool stats                  = false,
@@ -275,7 +281,7 @@ void recv_to_file(uhd::usrp::multi_usrp::sptr usrp,
 			// start thread to write current buffer, for each subfolder
 			for (int i = 0; i < folders.size(); i++){
 //				std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), rxtime.get_full_secs(), std::ref(buffs[tIdx].at(i)), threshold); // since rxtime is not accurate for twinRX, we revert to just a plain counter based on start timing
-                std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), time2send.get_full_secs() + numFilesWritten, std::ref(buffs[tIdx].at(i)), threshold); 
+                std::thread t(save_to_file<samp_type>, std::ref(folders.at(i)), time2send.get_full_secs() + numFilesWritten, std::ref(buffs[tIdx].at(i)), threshold, saturation_warning); 
 
 				t.detach();
 			}
@@ -379,7 +385,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
     std::string freqstr_list;
     size_t channel, total_num_samps, spb;
     double rate, freq, gain, bw, total_time, setup_time, lo_offset;
-    double threshold;
+    double threshold, saturation_warning;
 
     // setup the program options
     po::options_description desc("Allowed options");
@@ -418,6 +424,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         ("verbose", "turn on verbose reporting")
 		("folder", po::value<std::string>(&folder)->default_value(""), "path to write files to (will be created if it doesn't exist)")
         ("threshold", po::value<double>(&threshold)->default_value(0), "amplitude threshold before writing to disk")
+        ("saturation-warning", po::value<double>(&saturation_warning)->default_value(31000), "threshold value for saturation warning (any sample whose abs value exceeds this will produce a warning)")
     ;
 	
 	// Wizard style for clueless users
@@ -680,6 +687,7 @@ int UHD_SAFE_MAIN(int argc, char* argv[])
         total_num_samps,          \
         folders,                  \
         threshold,                \
+        saturation_warning,       \
         total_time,               \
         bw_summary,               \
         stats,                    \
