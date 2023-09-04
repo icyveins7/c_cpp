@@ -22,8 +22,8 @@ int main(int argc, char *argv[]){
     // compiling this will cause std threads to terminate and error in the main thread
 
     // try using future async
-    std::future<void> f1 = std::async(thread_func, 0);
-    std::future<void> f2 = std::async(thread_func, 1);
+    std::future<void> f1 = std::async(std::launch::async, thread_func, 0);
+    std::future<void> f2 = std::async(std::launch::async, thread_func, 1);
     try{
         f1.get();
         f2.get();
