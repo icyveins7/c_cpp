@@ -14,7 +14,7 @@ int main()
     // First value
     std::complex<double> tone(std::cos(startPhase), std::sin(startPhase));
     // Step
-    std::complex<double> step(std::cos(rFreq), std::sin(rFreq));
+    std::complex<double> step(2*M_PI*std::cos(rFreq), 2*M_PI*std::sin(rFreq));
 
     for (size_t i = 1; i < length; ++i)
     {
@@ -22,6 +22,12 @@ int main()
     }
 
     printf("Tone after %zd steps is (%f, %f)\n", length, tone.real(), tone.imag());
+
+    std::complex<double> exact(
+        std::cos(startPhase + 2*M_PI*rFreq),
+        std::sin(startPhase + 2*M_PI*rFreq)
+    );
+    printf("Exact value is (%f, %f)\n", exact.real(), exact.imag());
 
 
 
