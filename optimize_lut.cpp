@@ -1,8 +1,12 @@
+
+#define FP_FAST_FMAF
+#include <cmath>
 #include "timer.h"
 #include <iostream>
 #include <vector>
 #include <random>
 #include <stdint.h>
+
 
 void argb_lut(
     const float min,
@@ -12,9 +16,15 @@ void argb_lut(
     std::vector<uint32_t> &out
 )
 {
+    const float multiplier = (lut.size() - 1.0f) / range;
+    const float c = - min * (lut.size() - 1.0f) / range;
+
     for (int i = 0; i < out.size(); ++i)
     {
         int idx = (int)((in.at(i) - min) / range * (lut.size()-1));
+        // int idx = (int)(
+        //     std::fmaf(in.at(i), multiplier, c)
+        // ); // slower than compiler's optimizations!
         out.at(i) = lut.at(idx);
     }
 }
