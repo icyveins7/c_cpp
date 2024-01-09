@@ -46,8 +46,12 @@ void send_from_file(
     infile.read((char*)&buff.front(), buff.size() * sizeof(samp_type));
     infile.close();
 
-    // tx right at the end
-    tx_stream->send(&buff.front(), buff.size(), md);
+    for (size_t i = 0; i < buff.size(); i += samps_per_buff)
+    {
+        // hotpath
+        size_t num_tx_samps = std::min(samps_per_buff, buff.size() - i);
+        tx_stream->send(&buff.at(i), num_tx_samps, md);
+    }
 }
 
 int UHD_SAFE_MAIN(int argc, char* argv[])
