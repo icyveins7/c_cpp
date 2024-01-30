@@ -2,6 +2,22 @@
 #include <cmath>
 #include "timer.h"
 
+
+/* Exact calculation of the log-MAP algorithm */
+static float max_star4(
+					  float delta1, 
+					  float delta2 )
+{
+	/* Use C-function calls to compute the correction function */	
+	if (delta1 > delta2) {
+		return( (float) (delta1 + std::log( 1 + std::exp( delta2-delta1) ) ) );		
+	} else	{
+		return( (float) (delta2 + std::log( 1 + std::exp( delta1-delta2) ) ) );		
+	}
+}
+
+
+
 /* Values for linear approximation (DecoderType=5) */
 #define AJIAN -0.24904163195436
 #define TJIAN 2.50681740420944
@@ -124,9 +140,24 @@ int main()
         }
     }
 
+    // Time Original full log map
+    printf("Original maxstar4 (full log map):\n");
+    {
+        HighResolutionTimer timer;
+        for (int l = 0; l < loops; l++)
+        {
+            for (int i = 0; i < x.size(); i++)
+            {
+                z1[i] = max_star4(x[i], y[i]);
+            }
+        }
+    }
+
+
+
 
     // Time original call
-    printf("Original:\n");
+    printf("Original maxstar0 (linear log map approx):\n");
     {
         HighResolutionTimer timer;
         for (int l = 0; l < loops; l++)
@@ -137,8 +168,7 @@ int main()
             }
  
         }
-   }
-
+    }
     // Check all equal
     for (int i = 0; i < z1.size(); i++)
     {
