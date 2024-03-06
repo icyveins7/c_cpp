@@ -12,6 +12,14 @@ void addEigenVectors(
 ){
 	z = x + y;
 }
+
+void mulEigenVectors(
+	const VectorXcf& x,
+	const VectorXcf& y,
+    VectorXcf& z
+){
+	z = x * y;
+}
  
 int main()
 {
@@ -26,6 +34,11 @@ int main()
 
 	VectorXf z(1000);
 	addEigenVectors(x,y,z);
+
+	VectorXcf xc(4);
+	VectorXcf yc(4);
+	VectorXcf zc(4);
+	mulEigenVectors(xc,yc,zc);
 
 	std::cout << z << std::endl;
 	
