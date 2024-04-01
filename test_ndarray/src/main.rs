@@ -20,6 +20,10 @@ fn main() {
     let c = multiply_arrays(&x, &y);
     println!("c = {:?}", c);
 
+    // Multiply arrays without taking ownership
+    multiply_arrays_inplace(&mut x, &y);
+    println!("x = {:?}", x);
+
     // Create a complex-valued array?
     let z = array![Complex::new(1.0, 2.0), Complex::new(3.0, 4.0)];
     println!("z = {:?}", z);
@@ -32,6 +36,6 @@ fn multiply_arrays(a: &Array1<f64>, b: &Array1<f64>) -> Array1<f64>
     c // wtf we dont have return in rust
 }
 
-// fn multiply_arrays_inplace(a: &mut Array1<f64>, b: &Array1<f64>) {
-//     a = a * b;
-// }
+fn multiply_arrays_inplace(a: &mut Array1<f64>, b: &Array1<f64>) {
+    *a *= b;
+}
