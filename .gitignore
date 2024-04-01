@@ -8,3 +8,5 @@ gnuradio_graphs/*.py
 *.vscode/
 a.out
 *.asm
+.DS_Store
+
