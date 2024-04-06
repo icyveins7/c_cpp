@@ -4,6 +4,8 @@
 #include <vector>
 #include <boost/functional/hash.hpp>
 #include "timer.h"
+#include <cstdlib>
+#include <ctime>
 
 struct pair_hash{
     template <typename T1, typename T2>
@@ -19,6 +21,7 @@ struct pair_hash{
 
 int main()
 {
+    std::srand(std::time(nullptr));
 
     const int N = 1000000;
 
@@ -28,7 +31,9 @@ int main()
         HighResolutionTimer timer;
         for (int i = 0; i < N; ++i)
         {
-            std::pair<float, float> key{i+1, i+2};
+            std::pair<float, float> key{
+                (float)std::rand(),
+                (float)std::rand()};
             float val = (float)(i+3);
             m.insert({key, val});
         }
@@ -41,7 +46,9 @@ int main()
         HighResolutionTimer timer;
         for (int i = 0; i < N; ++i)
         {
-            std::pair<float, float> key{i+1, i+2};
+            std::pair<float, float> key{
+                (float)std::rand(),
+                (float)std::rand()};
             float val = (float)(i+3);
             mm.insert({key, val});
         }
@@ -54,29 +61,24 @@ int main()
         HighResolutionTimer timer;
         for (int i = 0; i < N; ++i)
         {
-            std::pair<float, float> key{i+1, i+2};
+            std::pair<float, float> key{
+                (float)std::rand(),
+                (float)std::rand()};
             float val = (float)(i+3);
             m2.insert({key, val});
         }
     }
 
-    std::vector<float> v;
-    std::cout << "pure vector with pushbacks" << std::endl;
-    {
-        HighResolutionTimer timer;
-        for (int i = 0; i < N; ++i)
-        {
-             v.push_back((float)(i+3));
-        }
-    }
 
     std::vector<float> v2(N);
-    std::cout << "pure vector with reserved N" << std::endl;
+    std::cout << "pure vector with reserved N, accessed via modulus" << std::endl;
     {
         HighResolutionTimer timer;
         for (int i = 0; i < N; ++i)
         {
-             v.at(i) = (float)(i+3);
+            // simulate range of pixel estimation
+            size_t idx = (std::rand() / 37 + 103) % N;
+            v2.at(idx) = (float)(i+3);
         }
     }
 
