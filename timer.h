@@ -3,8 +3,9 @@
 #include <vector>
 #include <utility>
 #include <string>
+#include <atomic>
 
-template <typename Tdur = std::chrono::milliseconds>
+template <typename Tdur = std::chrono::milliseconds, bool enforceFence = false>
 class HighResolutionTimer
 {
     using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
@@ -24,7 +25,11 @@ public:
      * @param label Optional label for the event.
      */
     void event(std::string label = ""){
+        if constexpr(enforceFence)
+            std::atomic_signal_fence(std::memory_order_seq_cst);
         m_t.push_back(std::make_pair(std::chrono::high_resolution_clock::now(), label));
+        if constexpr(enforceFence)
+            std::atomic_signal_fence(std::memory_order_seq_cst);
     }
 
     /**
@@ -65,7 +70,8 @@ private:
     std::vector<Event> m_t;
 
     double duration(const TimePoint& t1, const TimePoint &t2){
-        return std::chrono::duration<double>(t2 - t1).count();
+        using period_t = typename Tdur::period;
+        return std::chrono::duration<double, period_t>(t2 - t1).count();
     }
     std::string duration_string();
     void printSection(const Event& t1, const Event& t2){
