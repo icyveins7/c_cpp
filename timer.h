@@ -5,7 +5,7 @@
 #include <string>
 #include <atomic>
 
-template <typename Tdur = std::chrono::milliseconds, bool enforceFence = false>
+template <typename Tdur = std::chrono::milliseconds>
 class HighResolutionTimer
 {
     using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
@@ -23,12 +23,13 @@ public:
      * @brief Records a new event/measurement.
      *
      * @param label Optional label for the event.
+     * @param enforceFence Adds an atomic signal fence before and after.
      */
-    void event(std::string label = ""){
-        if constexpr(enforceFence)
+    void event(std::string label = "", bool enforceFence = false){
+        if (enforceFence)
             std::atomic_signal_fence(std::memory_order_seq_cst);
         m_t.push_back(std::make_pair(std::chrono::high_resolution_clock::now(), label));
-        if constexpr(enforceFence)
+        if (enforceFence)
             std::atomic_signal_fence(std::memory_order_seq_cst);
     }
 
@@ -36,10 +37,11 @@ public:
      * @brief Convenience method to clear() and then immediately record an event().
      *
      * @param label Optional label for the (first) event.
+     * @param enforceFence Adds an atomic signal fence before and after.
      */
-    void start(std::string label = "start"){
+    void start(std::string label = "start", bool enforceFence = false){
         clear();
-        event(label);
+        event(label, enforceFence);
     }
 
     /**
@@ -56,9 +58,10 @@ public:
      * @brief Convenience method to add a final event() and then report().
      *
      * @param label Optional label for the (last) event.
+     * @param enforceFence Adds an atomic signal fence before and after.
      */
-    void stop(std::string label = "end"){
-        event(label);
+    void stop(std::string label = "end", bool enforceFence = false){
+        event(label, enforceFence);
         report();
     }
 
