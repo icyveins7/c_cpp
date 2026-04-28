@@ -65,3 +65,15 @@ Surface_f make_Surface_f(ShapeType type, float z, void* shape){
   return s;
 }
 
+Surface_f make_Surface_f(float z, size_t size){
+
+}
+
+Surface_f make_Surface_f(float z, Rectangle rect){
+
+}
+
+
+Surface_f make_Surface_f(float z, Ellipse ell){
+
+}
